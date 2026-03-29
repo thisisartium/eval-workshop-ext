@@ -1,0 +1,13 @@
+# Default models per provider.
+#
+# The model is selected automatically based on which API key is set
+# in your .env file:
+#
+#   ANTHROPIC_API_KEY only → uses anthropic model
+#   OPENAI_API_KEY only    → uses openai model
+#   Both keys set          → uses anthropic model
+#
+# Override at the CLI with: --model <model-id>
+
+anthropic: "claude-sonnet-4-6"
+openai: "gpt-4o-mini"

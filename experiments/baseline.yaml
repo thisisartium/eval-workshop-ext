@@ -1,0 +1,18 @@
+# Baseline Experiment Configuration
+#
+# Concierge with no specialists - pure escalation.
+# All requests are classified and escalated to department human teams.
+#
+# Run with:
+#   cat-experiments run experiments/routing.py -c experiments/baseline.yaml \
+#     --dataset data/test_v2.jsonl
+
+name: "routing-baseline"
+description: "Baseline routing - concierge with pure escalation, no specialists"
+
+params:
+  config: "baseline.yaml"
+
+# Execution settings
+max_workers: 10
+repetitions: 1

@@ -1,0 +1,10 @@
+# Tuned Configuration
+#
+# Fully tuned concierge with HR specialist. Uses detailed prompts
+# with disambiguation rules, specialist consultation workflow,
+# and proper escalation handling.
+
+routing: "configs/agents/routing_tuned.yaml"
+
+specialists:
+  HR: "configs/agents/hr_tuned.yaml"

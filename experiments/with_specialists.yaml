@@ -1,0 +1,18 @@
+# HR Specialist Experiment Configuration (untuned)
+#
+# HR specialist with naive/untuned prompts.
+# Represents the "before tuning" state for comparison against hr_tuned.
+#
+# Run with:
+#   cat-experiments run experiments/hr_specialist.py \
+#     -c experiments/with_specialists.yaml --dataset live_hr
+
+name: "hr-with-specialists"
+description: "HR specialist with untuned prompts"
+
+params:
+  agent_config: "configs/agents/hr_with_specialists.yaml"
+
+# Execution settings
+max_workers: 10
+repetitions: 1

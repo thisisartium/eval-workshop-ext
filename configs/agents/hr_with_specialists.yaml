@@ -1,0 +1,9 @@
+# HR Specialist Agent (untuned)
+#
+# Naive HR specialist with basic KB search instructions.
+
+name: "HR"
+display_name: "HR Specialist"
+prompt_file: "prompts/specialists/hr/with_specialists.txt"
+tools:
+  - "search_knowledge_base"

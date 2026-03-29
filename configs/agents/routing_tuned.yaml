@@ -1,0 +1,11 @@
+# Tuned Routing Agent
+#
+# Fully tuned concierge with detailed department descriptions,
+# disambiguation rules, and specialist consultation workflow.
+
+name: "router"
+display_name: "Helpdesk Router"
+prompt_file: "prompts/routing/tuned.txt"
+tools:
+  - "escalate_to_department"
+  - "call_specialist"

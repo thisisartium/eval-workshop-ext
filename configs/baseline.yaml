@@ -1,0 +1,6 @@
+# Baseline Configuration
+#
+# Concierge with no specialists. All requests are classified
+# and escalated to the appropriate department's human team.
+
+routing: "configs/agents/routing_baseline.yaml"

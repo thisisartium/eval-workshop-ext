@@ -1,0 +1,21 @@
+# Tuned HR Specialist Experiment Configuration
+#
+# Fully tuned concierge with HR specialist. Uses detailed prompts
+# with disambiguation rules, specialist consultation workflow,
+# and proper escalation handling.
+#
+# This is the reference for "what good looks like" after eval-driven tuning.
+#
+# Run with:
+#   cat-experiments run experiments/hr_specialist.py -c experiments/hr_tuned.yaml \
+#     --dataset live_hr
+
+name: "hr-tuned"
+description: "Tuned HR specialist with knowledge base grounding"
+
+params:
+  agent_config: "configs/agents/hr_tuned.yaml"
+
+# Execution settings
+max_workers: 10
+repetitions: 1

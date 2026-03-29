@@ -1,0 +1,59 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+venv/
+env/
+
+# Environment variables
+.env
+.env.local
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Cat-evals experiment cache
+.cat_cache/
+
+# Evaluation results and outputs
+eval_results/
+predictions_*.jsonl
+results_*.json
+experiment_*.json
+
+# Logs
+*.log
+logs/
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Vector database (rebuild with: python -m helpdesk_agent.kb ingest)
+data/chromadb/
+docs/SPEAKER_OUTLINE.md
+docs/SPEAKER_COMMANDS.md

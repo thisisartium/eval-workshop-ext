@@ -1,0 +1,12 @@
+# Project-level cat-experiments configuration
+# These settings apply to all experiments in this project
+
+backend: cat-cafe
+url: http://localhost:8000
+max_workers: 3
+
+# Tracing / OTLP export to Cat Cafe collector
+enable_tracing: true
+otlp_endpoint: localhost:4318
+otlp_protocol: http
+otlp_insecure: true

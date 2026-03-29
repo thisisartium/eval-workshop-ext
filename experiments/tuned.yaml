@@ -1,0 +1,20 @@
+# Tuned Routing Experiment Configuration
+#
+# Baseline system config (no specialists) with the tuned routing prompt.
+# This isolates the prompt improvement: same architecture as baseline,
+# but with disambiguation rules, detailed department descriptions, etc.
+#
+# Run with:
+#   cat-experiments run experiments/routing.py -c experiments/tuned.yaml \
+#     --dataset data/test_v2.jsonl
+
+name: "routing-tuned"
+description: "Tuned routing prompt (no specialists)"
+
+params:
+  config: "baseline.yaml"
+  prompt_file: "prompts/routing/tuned.txt"
+
+# Execution settings
+max_workers: 10
+repetitions: 1

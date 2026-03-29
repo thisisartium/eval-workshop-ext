@@ -1,0 +1,12 @@
+# System Configuration (default)
+#
+# Points to the tuned configuration as the production default.
+# For experiments, use the specific configs:
+#   - configs/baseline.yaml          (escalation only, no specialists)
+#   - configs/with_specialists.yaml  (specialists, untuned prompts)
+#   - configs/tuned.yaml             (specialists, fully tuned prompts)
+
+routing: "configs/agents/routing_tuned.yaml"
+
+specialists:
+  HR: "configs/agents/hr_tuned.yaml"

@@ -1,0 +1,9 @@
+# With Specialists Configuration (untuned)
+#
+# Concierge with HR specialist enabled, using naive/untuned prompts.
+# Represents the "before tuning" state for comparison.
+
+routing: "configs/agents/routing_with_specialists.yaml"
+
+specialists:
+  HR: "configs/agents/hr_with_specialists.yaml"

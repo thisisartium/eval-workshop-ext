@@ -1,0 +1,50 @@
+[project]
+name = "helpdesk-agent"
+version = "0.1.0"
+description = "Helpdesk routing agent built on a custom agent platform"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    # Core agent platform dependencies — both LLM providers supported
+    "openai",
+    "anthropic",
+    "python-dotenv>=1.0.0",
+    # Config loading
+    "pyyaml>=6.0",
+    # Token counting for context window
+    "tiktoken",
+    # Knowledge base / RAG
+    "chromadb>=0.4.0",
+    # OpenTelemetry for tracing
+    "opentelemetry-api",
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp-proto-http",
+]
+
+[project.scripts]
+helpdesk-agent = "helpdesk.main:main"
+
+[build-system]
+requires = ["uv_build>=0.10.1,<0.11.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = ["agent_platform", "helpdesk"]
+
+[dependency-groups]
+dev = [
+    # Testing
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+    # CLI and formatting
+    "rich>=13.7.0",
+    # Experiment infrastructure
+    "cat-cafe-client>=0.0.3",
+    "cat-experiments[tracing]>=0.0.11",
+    # OpenTelemetry exporter (full, for grpc support)
+    "opentelemetry-exporter-otlp>=1.36.0",
+    "typing-extensions>=4.5.0",
+    # HTTP clients used by scripts
+    "httpx",
+    "requests",
+]

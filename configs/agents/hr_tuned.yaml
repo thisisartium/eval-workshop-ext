@@ -1,0 +1,10 @@
+# HR Specialist Agent (tuned)
+#
+# Fully tuned HR specialist with detailed process, guidelines,
+# and worked examples for full/partial/no answer scenarios.
+
+name: "HR"
+display_name: "HR Specialist"
+prompt_file: "prompts/specialists/hr/tuned.txt"
+tools:
+  - "search_knowledge_base"

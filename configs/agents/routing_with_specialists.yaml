@@ -1,0 +1,10 @@
+# Routing Agent with Specialists (untuned)
+#
+# Concierge that can consult specialists. Uses naive/untuned prompts.
+
+name: "router"
+display_name: "Helpdesk Router"
+prompt_file: "prompts/routing/with_specialists.txt"
+tools:
+  - "escalate_to_department"
+  - "call_specialist"

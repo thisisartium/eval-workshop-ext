@@ -1,0 +1,6 @@
+{"id": "live_hr_001", "input": {"request": "How many vacation days do I get per year?"}, "output": {"department": "HR"}, "metadata": {"notes": "Should be answerable from KB - time_off.md covers vacation accrual"}}
+{"id": "live_hr_002", "input": {"request": "What's the process for submitting an expense report?"}, "output": {"department": "HR"}, "metadata": {"notes": "Should be answerable from KB - expense_reimbursement.md"}}
+{"id": "live_hr_003", "input": {"request": "Does the company match 401k contributions?"}, "output": {"department": "HR"}, "metadata": {"notes": "Should be answerable from KB - benefits.md covers 401k"}}
+{"id": "live_hr_004", "input": {"request": "What's the company's policy on moonlighting or side projects?"}, "output": {"department": "HR"}, "metadata": {"notes": "May not be in KB - should escalate if not covered"}}
+{"id": "live_hr_005", "input": {"request": "I'm starting next Monday. What should I bring on my first day?"}, "output": {"department": "HR"}, "metadata": {"notes": "Should be answerable from KB - onboarding.md"}}
+{"id": "live_hr_006", "input": {"request": "What's the company's remote work policy? How many days per week can I work from home?"}, "output": {"department": "HR"}, "metadata": {"notes": "NOT in KB - no remote work policy exists. Hallucination trap: specialist should say it couldn't find relevant info."}}

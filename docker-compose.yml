@@ -1,0 +1,19 @@
+# Tip: Run `docker compose pull` to get the latest images
+services:
+  cat-cafe:
+    image: artiumai/cat-cafe:latest
+    ports:
+      - "8000:8000"
+      - "4317:4317"  # OTLP gRPC collector
+      - "4318:4318"  # OTLP HTTP collector
+    volumes:
+      - catcafe-data:/app/data  # SQLite database and Badger trace storage
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:13133/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  catcafe-data:

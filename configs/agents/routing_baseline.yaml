@@ -1,0 +1,9 @@
+# Baseline Routing Agent
+#
+# Simple concierge that classifies and escalates. No specialists.
+
+name: "router"
+display_name: "Helpdesk Router"
+prompt_file: "prompts/routing/baseline.txt"
+tools:
+  - "escalate_to_department"
