@@ -3,6 +3,7 @@ name = "helpdesk-agent"
 version = "0.1.0"
 description = "Helpdesk routing agent built on a custom agent platform"
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.13"
 dependencies = [
     # Core agent platform dependencies — both LLM providers supported
