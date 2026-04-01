@@ -418,7 +418,7 @@ Test your fix:
 uv run cat-experiments run experiments/routing.py \
   -c experiments/baseline.yaml \
   --dataset live_routing \
-  --param prompt=my_fix.txt
+  --param prompt_file=prompts/routing/my_fix.txt
 ```
 
 ### Step 3: Check Your Results
