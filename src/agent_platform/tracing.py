@@ -431,6 +431,8 @@ class OTelTracingProcessor(TracingProcessor):
                 otel_span.set_attribute(f"{prefix}.role", msg["role"])
                 content = msg.get("content", "")
                 if content:
+                    if not isinstance(content, str):
+                        content = json.dumps(content)
                     otel_span.set_attribute(f"{prefix}.content", content)
 
     def _to_wall_clock_ns(self, monotonic_secs: float) -> int:
