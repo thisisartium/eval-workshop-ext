@@ -41,7 +41,7 @@ dev = [
     "rich>=13.7.0",
     # Experiment infrastructure
     "cat-cafe-client>=0.0.3",
-    "cat-experiments[tracing]>=0.0.11",
+    "cat-experiments[tracing]>=0.0.13",
     # OpenTelemetry exporter (full, for grpc support)
     "opentelemetry-exporter-otlp>=1.36.0",
     "typing-extensions>=4.5.0",

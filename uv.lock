@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.13"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -159,18 +159,18 @@ wheels = [
 
 [[package]]
 name = "cat-experiments"
-version = "0.0.12"
+version = "0.0.13"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/aa/5d/e3e556342d0dd104ae93a40806352430eb68fccd0e549c94e309bb68330b/cat_experiments-0.0.12.tar.gz", hash = "sha256:f6041f778420dbde8491b834887ef3866cbacb2096cf02dba5821d2b005e72ec", size = 360514, upload-time = "2026-01-19T16:14:52.499Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6e/d9/08e253e26bc3e123e565a4e5e827e95f57fabb0fcee50ba1625f7ed70db1/cat_experiments-0.0.13.tar.gz", hash = "sha256:52ee2a5ed7c0cb348a9d0f11bc702ecba5598beaadb9667a0c9685a6ebd416e7", size = 478915, upload-time = "2026-10-21T18:37:52.34Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a2/7e/2bedfd7984a69c7123e68fc5c2f5730e5c88534828222c6c70946fd2ded5/cat_experiments-0.0.12-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:3c2a03a8b273d4ffcd809a7231f903e4e34cc3f2549eca90f0540645165e8e0e", size = 6035217, upload-time = "2026-01-19T16:14:49.927Z" },
-    { url = "https://files.pythonhosted.org/packages/0f/bb/ae3e9f169720e151636957e21fa0bfec4753c5d32e02f856f35b1be13ae3/cat_experiments-0.0.12-py3-none-macosx_11_0_arm64.whl", hash = "sha256:5533664fb9543374ea1aab98509eabea2a560b910310617576face1d33b7075e", size = 5654982, upload-time = "2026-01-19T16:14:58.51Z" },
-    { url = "https://files.pythonhosted.org/packages/40/9c/f8d71a76bbc96b866bcc44358887d1641d945b063314303e79619555bb45/cat_experiments-0.0.12-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:23a2cd0148d405b2eafdaf778fbfec6768380371f0b8c318791ad537b6f23078", size = 5338802, upload-time = "2026-01-19T16:15:00.19Z" },
-    { url = "https://files.pythonhosted.org/packages/28/33/c29054d83557f92b220d1b39fdedcdd9b462cea2e624039265fc8aabed94/cat_experiments-0.0.12-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:31eca5f4e5b93c36f788350762b1104a0a242822e7db5a33a1b38ce3752a3b82", size = 5829983, upload-time = "2026-01-19T16:14:56.625Z" },
-    { url = "https://files.pythonhosted.org/packages/6c/04/3d01b2ec704eaffc48096794aff3c5fb4fe0bd8937b37c48c35b0dbce313/cat_experiments-0.0.12-py3-none-win_amd64.whl", hash = "sha256:4a415e59ce01d700b66499c239f1622563ce184926544810a02d3de2d2b369fb", size = 5986676, upload-time = "2026-01-19T16:14:54.352Z" },
+    { url = "https://files.pythonhosted.org/packages/23/4e/a306fa1fead1a19d8b3b2ea29de72e1ebb666e71c8997649db69c3b0d6d3/cat_experiments-0.0.13-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:d8a83177bb45a0c4584807d004d9ec3d2da4fe0541147cfcd87322c2de7c22b1", size = 6858060, upload-time = "2026-10-21T18:37:44.94Z" },
+    { url = "https://files.pythonhosted.org/packages/52/77/08e5c188c1c4a5eced0b98b1c1b1be7316bb082eaf0a4bc958949f1162df/cat_experiments-0.0.13-py3-none-macosx_11_0_arm64.whl", hash = "sha256:ec4c699519c7cb4499c709212ec4d731e08fc8b488561ed0d679ba6925ca51b3", size = 6361234, upload-time = "2026-10-21T18:37:46.549Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/0f/01b4422a9fd98bd499e403a648045e8a37cf78b750a9ac56b60d61903a81/cat_experiments-0.0.13-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:dcfdb454205f28e8e0d4945a0b97093d556cbeaf69cdbeab6273c441bf39fca6", size = 6023359, upload-time = "2026-10-21T18:37:48.057Z" },
+    { url = "https://files.pythonhosted.org/packages/d7/9d/b13e53926906c4fbfc0bef181234b53a00062f6807b5fc38ddab0ac443da/cat_experiments-0.0.13-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:8695ce5df17064b0a565bdd83c3c804fd1393506aa9ff2bfd7afecf0aca339f6", size = 6653532, upload-time = "2026-10-21T18:37:49.744Z" },
+    { url = "https://files.pythonhosted.org/packages/88/cc/cd2dc6265da5dea9c5d24b7a05458fb8440ce75f96111651e3ad0c41d62c/cat_experiments-0.0.13-py3-none-win_amd64.whl", hash = "sha256:85829f0c9d04ccd037f4cc78b7a9d8c284663fc7b634898ca3c8b3b0df387bbb", size = 6837947, upload-time = "2026-10-21T18:37:51.082Z" },
 ]
 
 [package.optional-dependencies]
@@ -458,7 +458,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "cat-cafe-client", specifier = ">=0.0.3" },
-    { name = "cat-experiments", extras = ["tracing"], specifier = ">=0.0.11" },
+    { name = "cat-experiments", extras = ["tracing"], specifier = ">=0.0.13" },
     { name = "httpx" },
     { name = "opentelemetry-exporter-otlp", specifier = ">=1.36.0" },
     { name = "pytest", specifier = ">=9.0.2" },
