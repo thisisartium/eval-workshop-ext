@@ -143,7 +143,7 @@ async def department_match(eval_input: EvalInput) -> EvalOutput:
     # Extract tool calls from task spans (captured automatically by executor)
     tool_calls = extract_tool_calls(eval_input.task_spans or [])
 
-    # Get actual department from tool calls
+    # Get actual department from tool calls (LLM agent path)
     actual_department = None
     for tc in tool_calls:
         if tc.get("name") == "escalate_to_department":
@@ -152,6 +152,12 @@ async def department_match(eval_input: EvalInput) -> EvalOutput:
         if tc.get("name") == "call_specialist":
             actual_department = tc.get("args", {}).get("specialist")
             break
+
+    # Fallback: department in task output / metadata (decision router path)
+    if not actual_department and isinstance(eval_input.actual_output, dict):
+        actual_department = eval_input.actual_output.get("department")
+    if not actual_department and isinstance(eval_input.task_metadata, dict):
+        actual_department = eval_input.task_metadata.get("department")
 
     # Score: 1.0 if match, 0.0 otherwise
     if expected_department and actual_department:

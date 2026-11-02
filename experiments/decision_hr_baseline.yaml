@@ -1,0 +1,16 @@
+# Decision-model HR specialist experiment (untuned)
+#
+# Same agent as with_specialists.yaml; faithfulness scored by a decision model.
+#
+# Run with:
+#   cat-experiments run experiments/decision_hr_specialist.py \
+#     -c experiments/decision_hr_baseline.yaml --dataset live_hr
+
+name: "hr-decision-with-specialists"
+description: "HR specialist (untuned) with decision-model faithfulness judge"
+
+params:
+  agent_config: "configs/agents/hr_with_specialists.yaml"
+
+max_workers: 5
+repetitions: 1

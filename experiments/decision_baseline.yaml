@@ -1,0 +1,17 @@
+# Decision-model router experiment configuration
+#
+# Escalate-only routing via LiteLLM asystemone (Choice + Noul), comparable to
+# the LLM baseline experiment (experiments/baseline.yaml).
+#
+# Run with:
+#   cat-experiments run experiments/decision_routing.py \
+#     -c experiments/decision_baseline.yaml --dataset live_routing
+
+name: "routing-decision-baseline"
+description: "Decision router - escalate-only department classification"
+
+params: {}
+
+# Execution settings
+max_workers: 5
+repetitions: 1
