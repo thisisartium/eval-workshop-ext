@@ -55,12 +55,28 @@ Filter fails in Cat Cafe:
 evaluations.hr_response_quality.score < 0.8
 ```
 
+## Judge speed + cost benchmark
+
+Generate HR specialist answers once, then compare judges on the same triples (pass rate, agreement with the LLM judge, wall-clock, tokens, USD, API calls):
+
+- **LLM judge** — always-on critique
+- **Decision (per call)** — one Noul per example; LLM critique only if `score < 0.8`
+- **Decision (batch)** — one `asystemone` for all examples; LLM critique only on fails
+
+Agent generation cost is printed separately and excluded from the judge table. Costs use [`pricing.py`](../src/helpdesk/pricing.py).
+
+```bash
+uv run python scripts/compare_hr_judge_bench.py \
+  --dataset data/live_workshop_hr.jsonl
+```
+
 ## Files
 
 | Path | Role |
 | --- | --- |
-| `src/helpdesk/decision_hr_judge.py` | Noul + threshold |
+| `src/helpdesk/decision_hr_judge.py` | Noul + threshold + batch |
 | `src/helpdesk/llm_faithfulness_critique.py` | Shared LLM critique prompt/call |
 | `experiments/decision_hr_specialist.py` | Same HR task + hybrid `hr_response_quality` |
 | `experiments/decision_hr_baseline.yaml` | Untuned agent + decision judge |
 | `experiments/decision_hr_tuned.yaml` | Tuned agent + decision judge |
+| `scripts/compare_hr_judge_bench.py` | LLM vs decision per-call vs batch speed/cost bench |

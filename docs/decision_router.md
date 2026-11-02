@@ -62,13 +62,32 @@ Compare in Cat Cafe under **Datasets → live_routing → Experiments** (`routin
 
 Department options: IT, HR, Facilities, Finance, Legal, Security. Criteria call out workshop confusions (employee expenses → HR vs vendor invoice → Finance, etc.).
 
+## Speed + cost benchmark
+
+Compare the escalate-only LLM router vs the decision model on the same dataset (accuracy, wall-clock, tokens, USD, API calls). The table has three rows:
+
+- **Agent** — baseline escalate-only LLM router
+- **Decision (per call)** — one System One request per example
+- **Decision (batch)** — **one** `asystemone` call for the whole dataset (parallel questions over `state.tickets`)
+
+Costs use hardcoded rates in [`src/helpdesk/pricing.py`](../src/helpdesk/pricing.py) (update when list prices change — no live fetch). The summary prints speedup/cost delta/multiplier for agent vs batch and for per-call vs batch.
+
+```bash
+uv run python scripts/compare_routing_bench.py \
+  --dataset data/live_workshop_routing.jsonl
+```
+
+Uses `default_model()` for the agent (see `configs/models.yaml`). Override with `--model <id>` if needed.
+
 ## Files
 
 | Path | Role |
 | --- | --- |
 | `src/helpdesk/decision_router.py` | Questions, thresholds, escalate |
+| `src/helpdesk/pricing.py` | Hardcoded USD/MTok rates for cost estimates |
 | `experiments/decision_routing.py` | Experiment task + `department_match` |
 | `experiments/decision_baseline.yaml` | Experiment config |
 | `scripts/decision_route_once.py` | One-off smoke CLI |
+| `scripts/compare_routing_bench.py` | Agent vs decision per-call vs batch speed/cost bench |
 
-For the parallel HR faithfulness judge (probability score + thresholded failure reason), see [decision_hr_judge.md](decision_hr_judge.md). Pitch: [why_decision_models.md](why_decision_models.md).
+For the parallel HR faithfulness judge (probability score + thresholded failure reason), see [decision_hr_judge.md](decision_hr_judge.md). Pitch + workshop benches: [why_decision_models.md](why_decision_models.md).

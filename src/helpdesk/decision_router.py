@@ -121,6 +121,17 @@ class DecisionRouteResult:
         }
 
 
+@dataclass
+class DecisionBatchResult:
+    """One LiteLLM asystemone call covering many tickets."""
+
+    results: dict[str, DecisionRouteResult]
+    model: str | None = None
+    input_tokens: int = 0
+    output_tokens: int = 0
+    api_calls: int = 1
+
+
 def _decide_department(noul: float, choice: str | None) -> tuple[str, bool]:
     """Apply Noul thresholds; return (department, abstained)."""
     if noul <= NOUL_NO:
@@ -170,6 +181,26 @@ def _choice_question(instructions: str) -> dict[str, Any]:
         "type": "choice",
         "instructions": instructions,
         "criteria": DEPARTMENT_CRITERIA,
+    }
+
+
+def _ticket_path(example_id: str) -> str:
+    """State path for a ticket in a batch request (backtick form for instructions)."""
+    return f"tickets.{example_id}"
+
+
+def _batch_questions_for_id(example_id: str) -> dict[str, dict[str, Any]]:
+    """Noul + Choice for one ticket id, referencing ``tickets.<id>`` in state."""
+    path = f"`{_ticket_path(example_id)}`"
+    return {
+        f"is_helpdesk_{example_id}": _noul_question(
+            f"Does {path} ask the company helpdesk to take action or "
+            "answer a work-related support question for an employee?"
+        ),
+        f"department_{example_id}": _choice_question(
+            f"Which department should handle {path}? Pick the single "
+            "best match among the departments."
+        ),
     }
 
 
@@ -229,7 +260,7 @@ async def route_with_decision(
     Args:
         request: Employee helpdesk message.
         processor: Optional tracing processor (emits a tool span).
-        escalate: If False, skip ``escalate_to_department`` (labels only).
+        escalate: If False, skip ``escalate_to_department`` (bench / labels only).
 
     Returns:
         DecisionRouteResult with department, user-facing response, and probs.
@@ -281,6 +312,67 @@ async def route_with_decision(
         model=model,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
+    )
+
+
+async def route_batch_with_decision(tickets: dict[str, str]) -> DecisionBatchResult:
+    """Classify many tickets in a single LiteLLM ``asystemone`` call.
+
+    Args:
+        tickets: Mapping of example id -> request text.
+
+    Returns:
+        DecisionBatchResult with per-id route results and aggregate usage.
+    """
+    if not tickets:
+        return DecisionBatchResult(results={})
+
+    load_dotenv(override=True)
+
+    questions: dict[str, dict[str, Any]] = {}
+    for example_id in tickets:
+        questions.update(_batch_questions_for_id(example_id))
+
+    state = {"tickets": dict(tickets)}
+
+    response = await litellm.asystemone(
+        model=decision_model(),
+        state=state,
+        questions=questions,
+    )
+
+    answers = _answer_map(response)
+    input_tokens, output_tokens = _usage_tokens(response)
+    model = getattr(response, "model", None)
+    if model is None and isinstance(response, dict):
+        model = response.get("model")
+
+    results: dict[str, DecisionRouteResult] = {}
+    for example_id in tickets:
+        noul_val = _get_noul(answers[f"is_helpdesk_{example_id}"])
+        choice, confidence, probabilities = _get_choice(
+            answers[f"department_{example_id}"]
+        )
+        department, abstained = _decide_department(noul_val, choice)
+        results[example_id] = DecisionRouteResult(
+            department=department,
+            response="",
+            is_helpdesk_noul=noul_val,
+            choice=choice,
+            choice_confidence=confidence,
+            choice_probabilities=probabilities,
+            abstained=abstained,
+            model=model,
+            input_tokens=0,
+            output_tokens=0,
+        )
+
+    return DecisionBatchResult(
+        results=results,
+        model=model,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        api_calls=1,
     )
 
 

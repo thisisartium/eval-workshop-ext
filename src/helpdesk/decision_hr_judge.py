@@ -62,6 +62,17 @@ class DecisionFaithfulnessResult:
         }
 
 
+@dataclass
+class DecisionFaithfulnessBatchResult:
+    """One LiteLLM asystemone call covering many faithfulness judgments."""
+
+    results: dict[str, DecisionFaithfulnessResult]
+    model: str | None = None
+    input_tokens: int = 0
+    output_tokens: int = 0
+    api_calls: int = 1
+
+
 def _normalize_case(
     question: str,
     retrieved_context: str,
@@ -81,6 +92,14 @@ def _noul_question(instructions: str) -> dict[str, Any]:
         "instructions": instructions,
         "criteria": IS_FAITHFUL_CRITERIA,
     }
+
+
+def _case_noul(example_id: str) -> dict[str, Any]:
+    path = f"`cases.{example_id}`"
+    return _noul_question(
+        f"Is {path}.response faithful to {path}.retrieved_context "
+        f"for answering {path}.question?"
+    )
 
 
 def _usage_tokens(response: Any) -> tuple[int, int]:
@@ -153,6 +172,69 @@ async def judge_faithfulness(
         model=model,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
+    )
+
+
+async def judge_faithfulness_batch(
+    cases: dict[str, dict[str, str]],
+) -> DecisionFaithfulnessBatchResult:
+    """Score many faithfulness cases in one LiteLLM ``asystemone`` call.
+
+    Args:
+        cases: Mapping of example id -> keys ``question``, ``retrieved_context``,
+            ``response``.
+
+    Returns:
+        DecisionFaithfulnessBatchResult with per-id results and aggregate usage.
+    """
+    if not cases:
+        return DecisionFaithfulnessBatchResult(results={})
+
+    load_dotenv(override=True)
+
+    normalized = {
+        example_id: _normalize_case(
+            case.get("question", ""),
+            case.get("retrieved_context", ""),
+            case.get("response", ""),
+        )
+        for example_id, case in cases.items()
+    }
+    questions = {
+        f"is_faithful_{example_id}": _case_noul(example_id)
+        for example_id in normalized
+    }
+    state = {"cases": normalized}
+
+    answer = await litellm.asystemone(
+        model=decision_model(),
+        state=state,
+        questions=questions,
+    )
+
+    answers = _answer_map(answer)
+    input_tokens, output_tokens = _usage_tokens(answer)
+    model = getattr(answer, "model", None)
+    if model is None and isinstance(answer, dict):
+        model = answer.get("model")
+
+    results: dict[str, DecisionFaithfulnessResult] = {}
+    for example_id in normalized:
+        probability = _get_noul(answers[f"is_faithful_{example_id}"])
+        results[example_id] = DecisionFaithfulnessResult(
+            probability=probability,
+            passed=probability >= FAITHFUL_PASS,
+            model=model,
+            input_tokens=0,
+            output_tokens=0,
+        )
+
+    return DecisionFaithfulnessBatchResult(
+        results=results,
+        model=model,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        api_calls=1,
     )
 
 

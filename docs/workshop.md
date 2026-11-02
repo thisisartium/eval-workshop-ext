@@ -282,7 +282,7 @@ uv run cat-experiments run experiments/routing.py \
   --dataset live_routing
 ```
 
-Optional — compare against the parallel **decision router** (System One Choice + Noul via LiteLLM, escalate-only). Default model needs `OPENAI_API_KEY`. See [decision_router.md](decision_router.md) and the short pitch in [why_decision_models.md](why_decision_models.md).
+Optional — compare against the parallel **decision router** (System One Choice + Noul via LiteLLM, escalate-only). Default model needs `OPENAI_API_KEY`. See [decision_router.md](decision_router.md) and the short pitch in [why_decision_models.md](why_decision_models.md). Speed/cost: `uv run python scripts/compare_routing_bench.py --dataset data/live_workshop_routing.jsonl`.
 
 ```bash
 uv run cat-experiments run experiments/decision_routing.py \
@@ -654,7 +654,7 @@ Click into any example to see:
 
 Click into a failure and read the critique. It tells you exactly what went wrong — far more useful than a numeric score.
 
-Optional — compare against the parallel **decision faithfulness judge** (System One Noul probability; LLM critique only on fails). Default model needs `OPENAI_API_KEY`. Score is continuous in `[0, 1]`; explanation appears only when `score < 0.8`. See [decision_hr_judge.md](decision_hr_judge.md) and [why_decision_models.md](why_decision_models.md).
+Optional — compare against the parallel **decision faithfulness judge** (System One Noul probability; LLM critique only on fails). Default model needs `OPENAI_API_KEY`. Score is continuous in `[0, 1]`; explanation appears only when `score < 0.8`. See [decision_hr_judge.md](decision_hr_judge.md) and [why_decision_models.md](why_decision_models.md). Speed/cost: `uv run python scripts/compare_hr_judge_bench.py --dataset data/live_workshop_hr.jsonl`.
 
 ```bash
 uv run cat-experiments run experiments/decision_hr_specialist.py \
