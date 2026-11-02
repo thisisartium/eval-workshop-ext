@@ -1,6 +1,8 @@
-# Jev HR Faithfulness Judge (parallel path)
+# Decision HR Faithfulness Judge (parallel path)
 
-Scores HR specialist responses with [TypeSafe Jev](https://typesafe.ai) instead of always calling a binary LLM-as-judge. Same task as `experiments/hr_specialist.py`: run the specialist directly and evaluate groundedness against retrieved KB content.
+Scores HR specialist responses with a **System One / decision model** via [LiteLLM](https://docs.litellm.ai/docs/decisions/) (`asystemone`) instead of always calling a binary LLM-as-judge. Same task as `experiments/hr_specialist.py`: run the specialist directly and evaluate groundedness against retrieved KB content.
+
+Default model: TypeSafe Jev (`typesafe/jev-1.14.0`). Override with `DECISION_MODEL`. Public comparison: [Artificial Analysis Decision Index](https://artificialanalysis.ai/evaluations/artificial-analysis-decision-index).
 
 ## Why
 
@@ -12,7 +14,7 @@ Cat Cafe accepts continuous float scores; this path uses them as the evaluator s
 
 ## Setup
 
-Requires `TYPESAFE_API_KEY` (same as the Jev router). See [jev_router.md](jev_router.md). Also needs the usual OpenAI/Anthropic key for fail-only critiques.
+Requires a provider key for the configured `DECISION_MODEL` (default TypeSafe needs `TYPESAFE_API_KEY`). See [decision_router.md](decision_router.md). Also needs the usual OpenAI/Anthropic key for fail-only critiques.
 
 ## Side-by-side experiment
 
@@ -24,17 +26,17 @@ uv run cat-experiments run experiments/hr_specialist.py \
   -c experiments/with_specialists.yaml \
   --dataset live_hr
 
-# Jev probability + LLM critique on fails only
-uv run cat-experiments run experiments/jev_hr_specialist.py \
-  -c experiments/jev_hr_baseline.yaml \
+# Decision probability + LLM critique on fails only
+uv run cat-experiments run experiments/decision_hr_specialist.py \
+  -c experiments/decision_hr_baseline.yaml \
   --dataset live_hr
 ```
 
 Tuned agent variant:
 
 ```bash
-uv run cat-experiments run experiments/jev_hr_specialist.py \
-  -c experiments/jev_hr_tuned.yaml \
+uv run cat-experiments run experiments/decision_hr_specialist.py \
+  -c experiments/decision_hr_tuned.yaml \
   --dataset live_hr
 ```
 
@@ -58,8 +60,8 @@ evaluations.hr_response_quality.score < 0.8
 Generate HR specialist answers once, then compare judges on the same triples (pass rate, agreement with the LLM judge, wall-clock, tokens, USD, API calls):
 
 - **LLM judge** — always-on critique
-- **Jev (per call)** — one Noul per example; LLM critique only if `score < 0.8`
-- **Jev (batch)** — one TypeSafe `system_one` for all examples; LLM critique only on fails
+- **Decision (per call)** — one Noul per example; LLM critique only if `score < 0.8`
+- **Decision (batch)** — one `asystemone` for all examples; LLM critique only on fails
 
 Agent generation cost is printed separately and excluded from the judge table. Costs use [`pricing.py`](../src/helpdesk/pricing.py).
 
@@ -72,9 +74,9 @@ uv run python scripts/compare_hr_judge_bench.py \
 
 | Path | Role |
 | --- | --- |
-| `src/helpdesk/jev_hr_judge.py` | Jev Noul + threshold + batch |
+| `src/helpdesk/decision_hr_judge.py` | Noul + threshold + batch |
 | `src/helpdesk/llm_faithfulness_critique.py` | Shared LLM critique prompt/call |
-| `experiments/jev_hr_specialist.py` | Same HR task + hybrid `hr_response_quality` |
-| `experiments/jev_hr_baseline.yaml` | Untuned agent + Jev judge |
-| `experiments/jev_hr_tuned.yaml` | Tuned agent + Jev judge |
-| `scripts/compare_hr_judge_bench.py` | LLM vs Jev per-call vs batch speed/cost bench |
+| `experiments/decision_hr_specialist.py` | Same HR task + hybrid `hr_response_quality` |
+| `experiments/decision_hr_baseline.yaml` | Untuned agent + decision judge |
+| `experiments/decision_hr_tuned.yaml` | Tuned agent + decision judge |
+| `scripts/compare_hr_judge_bench.py` | LLM vs decision per-call vs batch speed/cost bench |

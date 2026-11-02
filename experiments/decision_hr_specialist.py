@@ -1,25 +1,26 @@
-"""HR Specialist experiment with TypeSafe Jev faithfulness judge.
+"""HR Specialist experiment with decision-model faithfulness judge.
 
 Evaluates the HR specialist agent DIRECTLY (skipping the concierge) using
-a Jev Noul probability for groundedness. LLM critique runs only when the
-score is below the pass threshold (saves calls on clear passes).
+a System One Noul probability for groundedness. LLM critique runs only when
+the score is below the pass threshold (saves calls on clear passes).
 
 Run with:
     # Untuned HR specialist
-    cat-experiments run experiments/jev_hr_specialist.py \
-        -c experiments/jev_hr_baseline.yaml --dataset live_hr
+    cat-experiments run experiments/decision_hr_specialist.py \
+        -c experiments/decision_hr_baseline.yaml --dataset live_hr
 
     # Tuned HR specialist
-    cat-experiments run experiments/jev_hr_specialist.py \
-        -c experiments/jev_hr_tuned.yaml --dataset live_hr
+    cat-experiments run experiments/decision_hr_specialist.py \
+        -c experiments/decision_hr_tuned.yaml --dataset live_hr
 
-Requires ``TYPESAFE_API_KEY`` in the environment.
+Requires a provider key for the configured ``DECISION_MODEL`` (default TypeSafe
+Jev needs ``TYPESAFE_API_KEY``).
 
 Evaluators
 ==========
 
-hr_response_quality: Continuous faithfulness probability from Jev.
-  Label is pass when score >= 0.8. Explanation (LLM critique) is set
+hr_response_quality: Continuous faithfulness probability from the decision
+  model. Label is pass when score >= 0.8. Explanation (LLM critique) is set
   only on fail.
 """
 
@@ -34,7 +35,7 @@ from cat.experiments.protocol import EvalInput, EvalOutput, TaskInput, TaskOutpu
 from cat.experiments.sdk import evaluator, task
 from cat.experiments.sdk.tracing import extract_retrieval_context
 from helpdesk.app import create_specialist_app, default_model
-from helpdesk.jev_hr_judge import FAITHFUL_PASS, judge_faithfulness
+from helpdesk.decision_hr_judge import FAITHFUL_PASS, judge_faithfulness
 from helpdesk.llm_faithfulness_critique import (
     faithfulness_critique_prompt,
     judge_with_llm,
@@ -42,9 +43,9 @@ from helpdesk.llm_faithfulness_critique import (
 
 load_dotenv()
 
-name = "HR Specialist (Jev Judge)"
+name = "HR Specialist (Decision Judge)"
 description = (
-    "Evaluate HR specialist with Jev faithfulness probability; "
+    "Evaluate HR specialist with decision-model faithfulness probability; "
     "LLM critique only below threshold"
 )
 params = {
@@ -92,7 +93,7 @@ async def answer_hr_question(input_data: TaskInput) -> TaskOutput:
 
 @evaluator
 async def hr_response_quality(eval_input: EvalInput) -> EvalOutput:
-    """Faithfulness probability via Jev; LLM critique only below threshold."""
+    """Faithfulness probability via decision model; LLM critique only below threshold."""
     question = ""
     example_input = eval_input.example.get("input", {})
     if isinstance(example_input, dict):

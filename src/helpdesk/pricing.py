@@ -28,13 +28,15 @@ class ModelRate:
 # Exact model ids used by this workshop.
 # Stored values are USD/MTok. Comments show the provider's published unit.
 RATES: dict[str, ModelRate] = {
-    # TypeSafe Jev — published $42 / BTok input, $0 output
-    # (docs.typesafe.ai/models). $42/BTok = $0.042/MTok. Input only.
+    # TypeSafe Jev (example decision model) — published $42 / BTok input,
+    # $0 output (docs.typesafe.ai/models). $42/BTok = $0.042/MTok. Input only.
     "jev": ModelRate(0.042, 0.0, "TypeSafe Jev"),
     "jev-latest": ModelRate(0.042, 0.0, "TypeSafe Jev"),
     "jev-preview": ModelRate(0.042, 0.0, "TypeSafe Jev"),
     "jev-1.14.0": ModelRate(0.042, 0.0, "TypeSafe Jev 1.14"),
     "jev-1.13.0": ModelRate(0.042, 0.0, "TypeSafe Jev 1.13"),
+    "typesafe/jev-1.14.0": ModelRate(0.042, 0.0, "TypeSafe Jev 1.14"),
+    "typesafe/jev-latest": ModelRate(0.042, 0.0, "TypeSafe Jev"),
     # OpenAI — published USD / MTok (developers.openai.com pricing).
     "gpt-6-luna": ModelRate(0.10, 0.50, "OpenAI gpt-6-luna"),  # $0.10 / $0.50 per MTok
     "gpt-4o-mini": ModelRate(0.15, 0.60, "OpenAI gpt-4o-mini"),  # $0.15 / $0.60 per MTok
@@ -45,7 +47,7 @@ RATES: dict[str, ModelRate] = {
 
 
 def resolve_rate(model: str) -> ModelRate:
-    """Look up a model rate; supports jev-* prefix fallback.
+    """Look up a model rate; supports jev-* / typesafe/jev-* fallback.
 
     Args:
         model: Provider model id from the API response or config.
@@ -58,10 +60,14 @@ def resolve_rate(model: str) -> ModelRate:
     """
     if model in RATES:
         return RATES[model]
+    # LiteLLM ids like typesafe/jev-1.14.0
+    bare = model.split("/", 1)[-1] if "/" in model else model
+    if bare in RATES:
+        return RATES[bare]
     # Versioned Jev ids like jev-1.14.0-rc1
-    if model.startswith("jev-1.14") or model.startswith("jev-1.13"):
+    if bare.startswith("jev-1.14") or bare.startswith("jev-1.13"):
         return RATES["jev"]
-    if model.startswith("jev"):
+    if bare.startswith("jev"):
         return RATES["jev"]
     known = ", ".join(sorted(RATES))
     raise KeyError(

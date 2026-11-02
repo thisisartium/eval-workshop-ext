@@ -1,20 +1,24 @@
-"""Jev-based HR response faithfulness judge.
+"""Decision-model HR response faithfulness judge.
 
-Uses TypeSafe Jev for groundedness scoring:
+Uses a System One / decision model via LiteLLM ``asystemone`` for groundedness
+scoring (default: TypeSafe Jev):
 - Noul for whether the agent response is faithful to retrieved KB content
 
 Code owns the pass threshold. Explanations on fail come from a separate
-LLM critique call in the experiment evaluator (not from Jev).
+LLM critique call in the experiment evaluator (not from the decision model).
 """
 
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from typing import Any
 
+import litellm
 from dotenv import load_dotenv
-from typesafe_sdk import AsyncTypeSafeClient, Noul
 
-# Raised above Typesafe's 0.7 starting default so borderline scores
+from helpdesk.decision_router import decision_model
+
+# Raised above the common 0.7 starting default so borderline scores
 # (e.g. 0.75) fail and trigger an LLM critique.
 FAITHFUL_PASS = 0.8
 
@@ -37,8 +41,8 @@ IS_FAITHFUL_CRITERIA = {
 
 
 @dataclass
-class JevFaithfulnessResult:
-    """Result of a Jev faithfulness judgment."""
+class DecisionFaithfulnessResult:
+    """Result of a decision-model faithfulness judgment."""
 
     probability: float
     passed: bool = False
@@ -47,7 +51,7 @@ class JevFaithfulnessResult:
     output_tokens: int = 0
 
     def metadata(self) -> dict:
-        """Jev fields suitable for experiment / Cat Cafe metadata."""
+        """Fields suitable for experiment / Cat Cafe metadata."""
         return {
             "probability": self.probability,
             "threshold": FAITHFUL_PASS,
@@ -59,10 +63,10 @@ class JevFaithfulnessResult:
 
 
 @dataclass
-class JevFaithfulnessBatchResult:
-    """One TypeSafe call covering many faithfulness judgments."""
+class DecisionFaithfulnessBatchResult:
+    """One LiteLLM asystemone call covering many faithfulness judgments."""
 
-    results: dict[str, JevFaithfulnessResult]
+    results: dict[str, DecisionFaithfulnessResult]
     model: str | None = None
     input_tokens: int = 0
     output_tokens: int = 0
@@ -82,15 +86,49 @@ def _normalize_case(
     }
 
 
-def _case_noul(example_id: str) -> Noul:
+def _noul_question(instructions: str) -> dict[str, Any]:
+    return {
+        "type": "noul",
+        "instructions": instructions,
+        "criteria": IS_FAITHFUL_CRITERIA,
+    }
+
+
+def _case_noul(example_id: str) -> dict[str, Any]:
     path = f"`cases.{example_id}`"
-    return Noul(
-        instructions=(
-            f"Is {path}.response faithful to {path}.retrieved_context "
-            f"for answering {path}.question?"
-        ),
-        criteria=IS_FAITHFUL_CRITERIA,
+    return _noul_question(
+        f"Is {path}.response faithful to {path}.retrieved_context "
+        f"for answering {path}.question?"
     )
+
+
+def _usage_tokens(response: Any) -> tuple[int, int]:
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return 0, 0
+    if isinstance(usage, dict):
+        return int(usage.get("input_tokens") or 0), int(
+            usage.get("output_tokens") or 0
+        )
+    return (
+        int(getattr(usage, "input_tokens", 0) or 0),
+        int(getattr(usage, "output_tokens", 0) or 0),
+    )
+
+
+def _answer_map(response: Any) -> dict[str, Any]:
+    answers = getattr(response, "answers", None)
+    if answers is None and isinstance(response, dict):
+        answers = response.get("answers")
+    if not isinstance(answers, dict):
+        raise TypeError("LiteLLM systemone response missing answers map")
+    return answers
+
+
+def _get_noul(answer: Any) -> float:
+    if isinstance(answer, dict):
+        return float(answer["noul"])
+    return float(answer.noul)
 
 
 async def judge_faithfulness(
@@ -98,63 +136,59 @@ async def judge_faithfulness(
     question: str,
     retrieved_context: str,
     response: str,
-    client: AsyncTypeSafeClient | None = None,
-) -> JevFaithfulnessResult:
-    """Score HR response faithfulness with Jev.
+) -> DecisionFaithfulnessResult:
+    """Score HR response faithfulness with a decision model.
 
     Args:
         question: User question.
         retrieved_context: KB snippets retrieved during the task.
         response: Agent response text.
-        client: Optional shared TypeSafe client.
 
     Returns:
-        JevFaithfulnessResult with probability, pass/fail, and usage.
+        DecisionFaithfulnessResult with probability, pass/fail, and usage.
     """
     load_dotenv(override=True)
 
     state = _normalize_case(question, retrieved_context, response)
     questions = {
-        "is_faithful": Noul(
-            instructions=IS_FAITHFUL_INSTRUCTIONS,
-            criteria=IS_FAITHFUL_CRITERIA,
-        ),
+        "is_faithful": _noul_question(IS_FAITHFUL_INSTRUCTIONS),
     }
 
-    if client is not None:
-        answer = await client.system_one(state=state, questions=questions)
-    else:
-        async with AsyncTypeSafeClient() as owned:
-            answer = await owned.system_one(state=state, questions=questions)
+    answer = await litellm.asystemone(
+        model=decision_model(),
+        state=state,
+        questions=questions,
+    )
 
-    usage = answer.usage
-    probability = float(answer.nouls["is_faithful"].noul)
-    return JevFaithfulnessResult(
+    input_tokens, output_tokens = _usage_tokens(answer)
+    probability = _get_noul(_answer_map(answer)["is_faithful"])
+    model = getattr(answer, "model", None)
+    if model is None and isinstance(answer, dict):
+        model = answer.get("model")
+
+    return DecisionFaithfulnessResult(
         probability=probability,
         passed=probability >= FAITHFUL_PASS,
-        model=answer.model,
-        input_tokens=int(usage.input_tokens or 0),
-        output_tokens=int(usage.output_tokens or 0),
+        model=model,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
     )
 
 
 async def judge_faithfulness_batch(
     cases: dict[str, dict[str, str]],
-    *,
-    client: AsyncTypeSafeClient | None = None,
-) -> JevFaithfulnessBatchResult:
-    """Score many faithfulness cases in one TypeSafe ``system_one`` call.
+) -> DecisionFaithfulnessBatchResult:
+    """Score many faithfulness cases in one LiteLLM ``asystemone`` call.
 
     Args:
         cases: Mapping of example id -> keys ``question``, ``retrieved_context``,
             ``response``.
-        client: Optional shared TypeSafe client.
 
     Returns:
-        JevFaithfulnessBatchResult with per-id results and aggregate usage.
+        DecisionFaithfulnessBatchResult with per-id results and aggregate usage.
     """
     if not cases:
-        return JevFaithfulnessBatchResult(results={})
+        return DecisionFaithfulnessBatchResult(results={})
 
     load_dotenv(override=True)
 
@@ -172,21 +206,22 @@ async def judge_faithfulness_batch(
     }
     state = {"cases": normalized}
 
-    if client is not None:
-        answer = await client.system_one(state=state, questions=questions)
-    else:
-        async with AsyncTypeSafeClient() as owned:
-            answer = await owned.system_one(state=state, questions=questions)
+    answer = await litellm.asystemone(
+        model=decision_model(),
+        state=state,
+        questions=questions,
+    )
 
-    usage = answer.usage
-    input_tokens = int(usage.input_tokens or 0)
-    output_tokens = int(usage.output_tokens or 0)
-    model = answer.model
+    answers = _answer_map(answer)
+    input_tokens, output_tokens = _usage_tokens(answer)
+    model = getattr(answer, "model", None)
+    if model is None and isinstance(answer, dict):
+        model = answer.get("model")
 
-    results: dict[str, JevFaithfulnessResult] = {}
+    results: dict[str, DecisionFaithfulnessResult] = {}
     for example_id in normalized:
-        probability = float(answer.nouls[f"is_faithful_{example_id}"].noul)
-        results[example_id] = JevFaithfulnessResult(
+        probability = _get_noul(answers[f"is_faithful_{example_id}"])
+        results[example_id] = DecisionFaithfulnessResult(
             probability=probability,
             passed=probability >= FAITHFUL_PASS,
             model=model,
@@ -194,7 +229,7 @@ async def judge_faithfulness_batch(
             output_tokens=0,
         )
 
-    return JevFaithfulnessBatchResult(
+    return DecisionFaithfulnessBatchResult(
         results=results,
         model=model,
         input_tokens=input_tokens,
@@ -203,6 +238,6 @@ async def judge_faithfulness_batch(
     )
 
 
-def faithfulness_result_as_dict(result: JevFaithfulnessResult) -> dict:
+def faithfulness_result_as_dict(result: DecisionFaithfulnessResult) -> dict:
     """Serialize a faithfulness result (tests / debugging)."""
     return asdict(result)

@@ -1,13 +1,14 @@
-"""Jev-based helpdesk routing experiment.
+"""Decision-model helpdesk routing experiment.
 
-Escalate-only department classification via TypeSafe Jev, comparable to
-``experiments/routing.py`` with ``experiments/baseline.yaml``.
+Escalate-only department classification via LiteLLM ``asystemone``, comparable
+to ``experiments/routing.py`` with ``experiments/baseline.yaml``.
 
 Run with:
-    cat-experiments run experiments/jev_routing.py \\
-        -c experiments/jev_baseline.yaml --dataset live_routing
+    cat-experiments run experiments/decision_routing.py \\
+        -c experiments/decision_baseline.yaml --dataset live_routing
 
-Requires ``TYPESAFE_API_KEY`` in the environment.
+Requires a provider key for the configured ``DECISION_MODEL`` (default TypeSafe
+Jev needs ``TYPESAFE_API_KEY``).
 """
 
 from __future__ import annotations
@@ -19,23 +20,25 @@ from agent_platform.tracing import OTelTracingProcessor
 from cat.experiments.protocol import EvalInput, EvalOutput, TaskInput, TaskOutput
 from cat.experiments.sdk import evaluator, task
 from cat.experiments.sdk.tracing import extract_tool_calls
-from helpdesk.jev_router import route_with_jev
+from helpdesk.decision_router import route_with_decision
 
 load_dotenv()
 
-name = "Helpdesk Routing (Jev)"
-description = "Route helpdesk requests with TypeSafe Jev (Choice + Noul)"
+name = "Helpdesk Routing (Decision Model)"
+description = (
+    "Route helpdesk requests with a System One decision model (Choice + Noul)"
+)
 params: dict = {}
 
 
 @task
 async def route_request(input_data: TaskInput) -> TaskOutput:
-    """Classify a request with Jev and escalate to the chosen department."""
+    """Classify a request with a decision model and escalate."""
     tracer = trace.get_tracer("agent_platform")
     processor = OTelTracingProcessor(tracer, capture_content=True)
 
     request = input_data.input.get("request", "")
-    result = await route_with_jev(request, processor=processor)
+    result = await route_with_decision(request, processor=processor)
 
     return TaskOutput(
         output={
@@ -48,10 +51,10 @@ async def route_request(input_data: TaskInput) -> TaskOutput:
 
 @evaluator
 async def department_match(eval_input: EvalInput) -> EvalOutput:
-    """Evaluate if the Jev router routed to the correct department.
+    """Evaluate if the decision router routed to the correct department.
 
     Prefers tool-call extraction when present; falls back to department
-    on the task output (Jev path always sets this).
+    on the task output (decision path always sets this).
     """
     expected_department = None
     if eval_input.expected_output:

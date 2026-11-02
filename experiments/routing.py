@@ -153,7 +153,7 @@ async def department_match(eval_input: EvalInput) -> EvalOutput:
             actual_department = tc.get("args", {}).get("specialist")
             break
 
-    # Fallback: department in task output / metadata (Jev router path)
+    # Fallback: department in task output / metadata (decision router path)
     if not actual_department and isinstance(eval_input.actual_output, dict):
         actual_department = eval_input.actual_output.get("department")
     if not actual_department and isinstance(eval_input.task_metadata, dict):

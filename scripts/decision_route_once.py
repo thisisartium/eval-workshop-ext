@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Smoke-test the Jev router on a single request.
+"""Smoke-test the decision router on a single request.
 
 Usage:
-    uv run python scripts/jev_route_once.py "My laptop won't turn on"
+    uv run python scripts/decision_route_once.py "My laptop won't turn on"
 """
 
 from __future__ import annotations
@@ -12,11 +12,13 @@ import asyncio
 import json
 import sys
 
-from helpdesk.jev_router import route_result_as_dict, route_with_jev
+from helpdesk.decision_router import route_result_as_dict, route_with_decision
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Route one request with Jev")
+    parser = argparse.ArgumentParser(
+        description="Route one request with a decision model"
+    )
     parser.add_argument(
         "request",
         nargs="?",
@@ -28,7 +30,7 @@ def parse_args() -> argparse.Namespace:
 
 async def main() -> int:
     args = parse_args()
-    result = await route_with_jev(args.request)
+    result = await route_with_decision(args.request)
     print(json.dumps(route_result_as_dict(result), indent=2))
     return 0
 

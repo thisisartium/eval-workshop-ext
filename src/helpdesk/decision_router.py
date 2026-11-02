@@ -1,6 +1,7 @@
-"""Jev-based helpdesk router (escalate-only).
+"""Decision-model helpdesk router (escalate-only).
 
-Uses TypeSafe Jev for department classification:
+Uses a System One / decision model via LiteLLM ``asystemone`` for department
+classification (default: TypeSafe Jev):
 - Choice over IT / HR / Facilities / Finance / Legal / Security
 - Companion Noul for whether the request belongs on the helpdesk at all
 
@@ -13,14 +14,26 @@ import json
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
+from typing import Any
 
+import os
+
+import litellm
 from dotenv import load_dotenv
-from typesafe_sdk import AsyncTypeSafeClient, Choice, Noul
 
 from agent_platform.observability import Span, ToolSpanData, TracingProcessor
 from helpdesk.tools import escalate_to_department
 
-# Thresholds for the is_helpdesk_request Noul (Typesafe starting defaults).
+# Default LiteLLM decision model (override with DECISION_MODEL).
+_DEFAULT_DECISION_MODEL = "typesafe/jev-1.14.0"
+
+
+def decision_model() -> str:
+    """LiteLLM model id for System One calls."""
+    return os.environ.get("DECISION_MODEL", _DEFAULT_DECISION_MODEL)
+
+
+# Thresholds for the is_helpdesk_request Noul (starting defaults).
 NOUL_YES = 0.7
 NOUL_NO = 0.3
 
@@ -79,8 +92,8 @@ DEPARTMENT_CHOICE_INSTRUCTIONS = (
 
 
 @dataclass
-class JevRouteResult:
-    """Result of a Jev routing decision plus escalation."""
+class DecisionRouteResult:
+    """Result of a decision-model routing call plus escalation."""
 
     department: str
     response: str
@@ -94,7 +107,7 @@ class JevRouteResult:
     output_tokens: int = 0
 
     def metadata(self) -> dict:
-        """Jev fields suitable for experiment / Cat Cafe metadata."""
+        """Fields suitable for experiment / Cat Cafe metadata."""
         return {
             "department": self.department,
             "abstained": self.abstained,
@@ -109,24 +122,23 @@ class JevRouteResult:
 
 
 @dataclass
-class JevBatchResult:
-    """One TypeSafe call covering many tickets."""
+class DecisionBatchResult:
+    """One LiteLLM asystemone call covering many tickets."""
 
-    results: dict[str, JevRouteResult]
+    results: dict[str, DecisionRouteResult]
     model: str | None = None
     input_tokens: int = 0
     output_tokens: int = 0
     api_calls: int = 1
 
 
-def _decide_department(noul: float, choice: str) -> tuple[str, bool]:
+def _decide_department(noul: float, choice: str | None) -> tuple[str, bool]:
     """Apply Noul thresholds; return (department, abstained)."""
-    if noul < NOUL_NO:
+    if noul <= NOUL_NO:
         return "None", True
-    if noul > NOUL_YES:
-        return choice, False
-    # Mid band: abstain rather than force a low-confidence route.
-    return "None", True
+    if noul < NOUL_YES:
+        return "None", True
+    return (choice or "None"), False
 
 
 def _emit_tool_span(
@@ -136,24 +148,40 @@ def _emit_tool_span(
     request: str,
     result: str,
 ) -> None:
-    """Emit an escalate_to_department tool span for Cat Cafe / traces."""
     if processor is None:
         return
-    trace_id = uuid.uuid4().hex[:16]
-    span = Span(
-        span_id=uuid.uuid4().hex[:8],
-        trace_id=trace_id,
-        parent_id=None,
-        span_data=ToolSpanData(
+    now = time.time()
+    processor.on_span_end(
+        Span(
+            span_id=str(uuid.uuid4()),
             name="escalate_to_department",
-            input=json.dumps({"department": department, "request": request}),
-        ),
+            started_at=now,
+            ended_at=now,
+            data=ToolSpanData(
+                name="escalate_to_department",
+                arguments=json.dumps(
+                    {"department": department, "request": request}
+                ),
+                result=result,
+            ),
+        )
     )
-    processor.on_span_start(span)
-    assert isinstance(span.span_data, ToolSpanData)
-    span.span_data.output = result
-    span.ended_at = time.monotonic()
-    processor.on_span_end(span)
+
+
+def _noul_question(instructions: str) -> dict[str, Any]:
+    return {
+        "type": "noul",
+        "instructions": instructions,
+        "criteria": IS_HELPDESK_CRITERIA,
+    }
+
+
+def _choice_question(instructions: str) -> dict[str, Any]:
+    return {
+        "type": "choice",
+        "instructions": instructions,
+        "criteria": DEPARTMENT_CRITERIA,
+    }
 
 
 def _ticket_path(example_id: str) -> str:
@@ -161,75 +189,99 @@ def _ticket_path(example_id: str) -> str:
     return f"tickets.{example_id}"
 
 
-def _batch_questions_for_id(example_id: str) -> dict:
+def _batch_questions_for_id(example_id: str) -> dict[str, dict[str, Any]]:
     """Noul + Choice for one ticket id, referencing ``tickets.<id>`` in state."""
     path = f"`{_ticket_path(example_id)}`"
     return {
-        f"is_helpdesk_{example_id}": Noul(
-            instructions=(
-                f"Does {path} ask the company helpdesk to take action or "
-                "answer a work-related support question for an employee?"
-            ),
-            criteria=IS_HELPDESK_CRITERIA,
+        f"is_helpdesk_{example_id}": _noul_question(
+            f"Does {path} ask the company helpdesk to take action or "
+            "answer a work-related support question for an employee?"
         ),
-        f"department_{example_id}": Choice(
-            instructions=(
-                f"Which department should handle {path}? Pick the single "
-                "best match among the departments."
-            ),
-            criteria=DEPARTMENT_CRITERIA,
+        f"department_{example_id}": _choice_question(
+            f"Which department should handle {path}? Pick the single "
+            "best match among the departments."
         ),
     }
 
 
-async def route_with_jev(
+def _usage_tokens(response: Any) -> tuple[int, int]:
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return 0, 0
+    if isinstance(usage, dict):
+        return int(usage.get("input_tokens") or 0), int(
+            usage.get("output_tokens") or 0
+        )
+    return (
+        int(getattr(usage, "input_tokens", 0) or 0),
+        int(getattr(usage, "output_tokens", 0) or 0),
+    )
+
+
+def _answer_map(response: Any) -> dict[str, Any]:
+    answers = getattr(response, "answers", None)
+    if answers is None and isinstance(response, dict):
+        answers = response.get("answers")
+    if not isinstance(answers, dict):
+        raise TypeError("LiteLLM systemone response missing answers map")
+    return answers
+
+
+def _get_noul(answer: Any) -> float:
+    if isinstance(answer, dict):
+        return float(answer["noul"])
+    return float(answer.noul)
+
+
+def _get_choice(answer: Any) -> tuple[str | None, float | None, dict[str, float]]:
+    if isinstance(answer, dict):
+        probs = answer.get("probabilities") or {}
+        return (
+            answer.get("choice"),
+            answer.get("confidence"),
+            {str(k): float(v) for k, v in probs.items()},
+        )
+    probs = getattr(answer, "probabilities", None) or {}
+    return (
+        getattr(answer, "choice", None),
+        getattr(answer, "confidence", None),
+        {str(k): float(v) for k, v in dict(probs).items()},
+    )
+
+
+async def route_with_decision(
     request: str,
     *,
     processor: TracingProcessor | None = None,
-    client: AsyncTypeSafeClient | None = None,
     escalate: bool = True,
-) -> JevRouteResult:
-    """Classify ``request`` with Jev and escalate to the chosen department.
+) -> DecisionRouteResult:
+    """Classify ``request`` with a decision model and escalate.
 
     Args:
         request: Employee helpdesk message.
         processor: Optional tracing processor (emits a tool span).
-        client: Optional shared TypeSafe client (reused across bench calls).
         escalate: If False, skip ``escalate_to_department`` (bench / labels only).
 
     Returns:
-        JevRouteResult with department, user-facing response, and Jev probs.
+        DecisionRouteResult with department, user-facing response, and probs.
     """
     load_dotenv(override=True)
 
     questions = {
-        "is_helpdesk_request": Noul(
-            instructions=IS_HELPDESK_INSTRUCTIONS,
-            criteria=IS_HELPDESK_CRITERIA,
-        ),
-        "department": Choice(
-            instructions=DEPARTMENT_CHOICE_INSTRUCTIONS,
-            criteria=DEPARTMENT_CRITERIA,
-        ),
+        "is_helpdesk_request": _noul_question(IS_HELPDESK_INSTRUCTIONS),
+        "department": _choice_question(DEPARTMENT_CHOICE_INSTRUCTIONS),
     }
 
-    if client is not None:
-        response = await client.system_one(
-            state={"request": request},
-            questions=questions,
-        )
-    else:
-        async with AsyncTypeSafeClient() as owned:
-            response = await owned.system_one(
-                state={"request": request},
-                questions=questions,
-            )
-
-    noul_answer = response.nouls["is_helpdesk_request"]
-    choice_answer = response.choices["department"]
-    department, abstained = _decide_department(
-        noul_answer.noul, choice_answer.choice
+    response = await litellm.asystemone(
+        model=decision_model(),
+        state={"request": request},
+        questions=questions,
     )
+
+    answers = _answer_map(response)
+    noul_val = _get_noul(answers["is_helpdesk_request"])
+    choice, confidence, probabilities = _get_choice(answers["department"])
+    department, abstained = _decide_department(noul_val, choice)
 
     if escalate:
         escalate_text = await escalate_to_department(
@@ -244,78 +296,78 @@ async def route_with_jev(
     else:
         escalate_text = ""
 
-    usage = response.usage
-    return JevRouteResult(
+    input_tokens, output_tokens = _usage_tokens(response)
+    model = getattr(response, "model", None)
+    if model is None and isinstance(response, dict):
+        model = response.get("model")
+
+    return DecisionRouteResult(
         department=department,
         response=escalate_text,
-        is_helpdesk_noul=noul_answer.noul,
-        choice=choice_answer.choice,
-        choice_confidence=choice_answer.confidence,
-        choice_probabilities=dict(choice_answer.probabilities),
+        is_helpdesk_noul=noul_val,
+        choice=choice,
+        choice_confidence=confidence,
+        choice_probabilities=probabilities,
         abstained=abstained,
-        model=response.model,
-        input_tokens=int(usage.input_tokens or 0),
-        output_tokens=int(usage.output_tokens or 0),
+        model=model,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
     )
 
 
-async def route_batch_with_jev(
-    tickets: dict[str, str],
-    *,
-    client: AsyncTypeSafeClient | None = None,
-) -> JevBatchResult:
-    """Classify many tickets in a single TypeSafe ``system_one`` call.
+async def route_batch_with_decision(tickets: dict[str, str]) -> DecisionBatchResult:
+    """Classify many tickets in a single LiteLLM ``asystemone`` call.
 
     Args:
         tickets: Mapping of example id -> request text.
-        client: Optional shared TypeSafe client.
 
     Returns:
-        JevBatchResult with per-id route results and aggregate usage.
+        DecisionBatchResult with per-id route results and aggregate usage.
     """
     if not tickets:
-        return JevBatchResult(results={})
+        return DecisionBatchResult(results={})
 
     load_dotenv(override=True)
 
-    questions: dict = {}
+    questions: dict[str, dict[str, Any]] = {}
     for example_id in tickets:
         questions.update(_batch_questions_for_id(example_id))
 
     state = {"tickets": dict(tickets)}
 
-    if client is not None:
-        response = await client.system_one(state=state, questions=questions)
-    else:
-        async with AsyncTypeSafeClient() as owned:
-            response = await owned.system_one(state=state, questions=questions)
+    response = await litellm.asystemone(
+        model=decision_model(),
+        state=state,
+        questions=questions,
+    )
 
-    usage = response.usage
-    input_tokens = int(usage.input_tokens or 0)
-    output_tokens = int(usage.output_tokens or 0)
-    model = response.model
+    answers = _answer_map(response)
+    input_tokens, output_tokens = _usage_tokens(response)
+    model = getattr(response, "model", None)
+    if model is None and isinstance(response, dict):
+        model = response.get("model")
 
-    results: dict[str, JevRouteResult] = {}
+    results: dict[str, DecisionRouteResult] = {}
     for example_id in tickets:
-        noul_answer = response.nouls[f"is_helpdesk_{example_id}"]
-        choice_answer = response.choices[f"department_{example_id}"]
-        department, abstained = _decide_department(
-            noul_answer.noul, choice_answer.choice
+        noul_val = _get_noul(answers[f"is_helpdesk_{example_id}"])
+        choice, confidence, probabilities = _get_choice(
+            answers[f"department_{example_id}"]
         )
-        results[example_id] = JevRouteResult(
+        department, abstained = _decide_department(noul_val, choice)
+        results[example_id] = DecisionRouteResult(
             department=department,
             response="",
-            is_helpdesk_noul=noul_answer.noul,
-            choice=choice_answer.choice,
-            choice_confidence=choice_answer.confidence,
-            choice_probabilities=dict(choice_answer.probabilities),
+            is_helpdesk_noul=noul_val,
+            choice=choice,
+            choice_confidence=confidence,
+            choice_probabilities=probabilities,
             abstained=abstained,
             model=model,
             input_tokens=0,
             output_tokens=0,
         )
 
-    return JevBatchResult(
+    return DecisionBatchResult(
         results=results,
         model=model,
         input_tokens=input_tokens,
@@ -324,6 +376,6 @@ async def route_batch_with_jev(
     )
 
 
-def route_result_as_dict(result: JevRouteResult) -> dict:
+def route_result_as_dict(result: DecisionRouteResult) -> dict:
     """Serialize a route result (tests / debugging)."""
     return asdict(result)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare LLM-as-judge vs Jev hybrid (per-call and batch) on HR answers.
+"""Compare LLM-as-judge vs decision-model hybrid (per-call and batch) on HR answers.
 
 Generates specialist responses once, then times/costs only the judges.
 Costs use ``helpdesk.pricing``.
@@ -19,7 +19,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from dotenv import load_dotenv
-from typesafe_sdk import AsyncTypeSafeClient
 
 from agent_platform.observability import (
     CostTracker,
@@ -30,7 +29,7 @@ from agent_platform.observability import (
 )
 from agent_platform.runner import collect
 from helpdesk.app import create_specialist_app, default_model
-from helpdesk.jev_hr_judge import (
+from helpdesk.decision_hr_judge import (
     FAITHFUL_PASS,
     judge_faithfulness,
     judge_faithfulness_batch,
@@ -63,7 +62,7 @@ class JudgeTotals:
     seconds: float = 0.0
     api_calls: int = 0
     # TypeSafe usage
-    ts_model: str = "jev-latest"
+    ts_model: str = "decision"
     ts_input_tokens: int = 0
     ts_output_tokens: int = 0
     # LLM critique / judge usage
@@ -152,10 +151,10 @@ def _print_compare(label: str, slow: JudgeTotals, fast: JudgeTotals) -> None:
 
 def print_table(
     llm: JudgeTotals,
-    jev: JudgeTotals,
-    jev_batch: JudgeTotals,
+    decision: JudgeTotals,
+    decision_batch: JudgeTotals,
 ) -> None:
-    rows = [llm, jev, jev_batch]
+    rows = [llm, decision, decision_batch]
     headers = (
         "Method",
         "Pass",
@@ -204,23 +203,30 @@ def print_table(
         f"llm_tok={llm.llm_input_tokens}/{llm.llm_output_tokens}"
     )
     print(
-        f"  Jev per-call:  ts_tok={jev.ts_input_tokens}/{jev.ts_output_tokens} "
-        f"llm_calls={jev.llm_calls} "
-        f"llm_tok={jev.llm_input_tokens}/{jev.llm_output_tokens}"
+        f"  Decision per-call:  ts_tok={decision.ts_input_tokens}/{decision.ts_output_tokens} "
+        f"llm_calls={decision.llm_calls} "
+        f"llm_tok={decision.llm_input_tokens}/{decision.llm_output_tokens}"
     )
     print(
-        f"  Jev batch:     ts_tok={jev_batch.ts_input_tokens}/{jev_batch.ts_output_tokens} "
-        f"llm_calls={jev_batch.llm_calls} "
-        f"llm_tok={jev_batch.llm_input_tokens}/{jev_batch.llm_output_tokens}"
+        f"  Decision batch:     ts_tok={decision_batch.ts_input_tokens}/{decision_batch.ts_output_tokens} "
+        f"llm_calls={decision_batch.llm_calls} "
+        f"llm_tok={decision_batch.llm_input_tokens}/{decision_batch.llm_output_tokens}"
     )
     print()
-    _print_compare("llm / jev-batch", llm, jev_batch)
+    _print_compare("llm / decision-batch", llm, decision_batch)
     print()
-    _print_compare("jev-per-call / jev-batch", jev, jev_batch)
+    _print_compare("decision-per-call / decision-batch", decision, decision_batch)
     print()
-    models = [m for m in (llm.llm_model, jev.ts_model, jev_batch.ts_model) if m]
-    if jev.llm_model:
-        models.append(jev.llm_model)
+    models = [
+        m
+        for m in (
+            llm.llm_model,
+            decision.ts_model,
+            decision_batch.ts_model,
+            decision.llm_model,
+        )
+        if m
+    ]
     print(format_rates_footer(models))
 
 
@@ -303,64 +309,62 @@ async def run_llm_judge(
     return totals
 
 
-async def run_jev_per_call(
+async def run_decision_per_call(
     cases: list[CasePayload],
     llm_model: str,
     llm_labels: list[bool],
 ) -> JudgeTotals:
-    totals = JudgeTotals(name="Jev (per call)", llm_model=llm_model)
+    totals = JudgeTotals(name="Decision (per call)", llm_model=llm_model)
     resolve_rate(llm_model)
 
-    async with AsyncTypeSafeClient() as ts_client:
-        for i, case in enumerate(cases):
-            t0 = time.perf_counter()
-            judgment = await judge_faithfulness(
-                question=case.question,
-                retrieved_context=case.retrieved_context,
-                response=case.response,
-                client=ts_client,
+    for i, case in enumerate(cases):
+        t0 = time.perf_counter()
+        judgment = await judge_faithfulness(
+            question=case.question,
+            retrieved_context=case.retrieved_context,
+            response=case.response,
+        )
+        totals.ts_input_tokens += judgment.input_tokens
+        totals.ts_output_tokens += judgment.output_tokens
+        totals.api_calls += 1
+        if judgment.model:
+            totals.ts_model = judgment.model
+            resolve_rate(judgment.model)
+
+        if not judgment.passed:
+            prompt = faithfulness_critique_prompt(
+                case.question, case.retrieved_context, case.response
             )
-            totals.ts_input_tokens += judgment.input_tokens
-            totals.ts_output_tokens += judgment.output_tokens
+            critique = await judge_with_llm(prompt, llm_model)
+            totals.llm_calls += 1
             totals.api_calls += 1
-            if judgment.model:
-                totals.ts_model = judgment.model
-                resolve_rate(judgment.model)
+            totals.llm_input_tokens += int(critique.get("input_tokens") or 0)
+            totals.llm_output_tokens += int(critique.get("output_tokens") or 0)
 
-            if not judgment.passed:
-                prompt = faithfulness_critique_prompt(
-                    case.question, case.retrieved_context, case.response
-                )
-                critique = await judge_with_llm(prompt, llm_model)
-                totals.llm_calls += 1
-                totals.api_calls += 1
-                totals.llm_input_tokens += int(critique.get("input_tokens") or 0)
-                totals.llm_output_tokens += int(critique.get("output_tokens") or 0)
-
-            elapsed = time.perf_counter() - t0
-            totals.seconds += elapsed
-            totals.total += 1
-            totals.labels.append(judgment.passed)
-            if judgment.passed:
-                totals.passes += 1
-            if judgment.passed == llm_labels[i]:
-                totals.agree_with_llm += 1
-            print(
-                f"  [jev]   {case.example_id}: "
-                f"p={judgment.probability:.2f} "
-                f"{'pass' if judgment.passed else 'fail'} "
-                f"{elapsed:.2f}s tok={judgment.input_tokens}/{judgment.output_tokens}"
-            )
+        elapsed = time.perf_counter() - t0
+        totals.seconds += elapsed
+        totals.total += 1
+        totals.labels.append(judgment.passed)
+        if judgment.passed:
+            totals.passes += 1
+        if judgment.passed == llm_labels[i]:
+            totals.agree_with_llm += 1
+        print(
+            f"  [decision] {case.example_id}: "
+            f"p={judgment.probability:.2f} "
+            f"{'pass' if judgment.passed else 'fail'} "
+            f"{elapsed:.2f}s tok={judgment.input_tokens}/{judgment.output_tokens}"
+        )
 
     return totals
 
 
-async def run_jev_batch(
+async def run_decision_batch(
     cases: list[CasePayload],
     llm_model: str,
     llm_labels: list[bool],
 ) -> JudgeTotals:
-    totals = JudgeTotals(name="Jev (batch)", llm_model=llm_model)
+    totals = JudgeTotals(name="Decision (batch)", llm_model=llm_model)
     resolve_rate(llm_model)
 
     case_map = {
@@ -371,12 +375,11 @@ async def run_jev_batch(
         }
         for c in cases
     }
-    print(f"  Jev batch: 1 system_one call for {len(case_map)} examples")
+    print(f"  Decision batch: 1 systemone call for {len(case_map)} examples")
 
-    async with AsyncTypeSafeClient() as ts_client:
-        t0 = time.perf_counter()
-        batch = await judge_faithfulness_batch(case_map, client=ts_client)
-        ts_elapsed = time.perf_counter() - t0
+    t0 = time.perf_counter()
+    batch = await judge_faithfulness_batch(case_map)
+    ts_elapsed = time.perf_counter() - t0
 
     totals.seconds += ts_elapsed
     totals.api_calls += batch.api_calls
@@ -422,7 +425,7 @@ async def run_jev_batch(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Compare LLM vs Jev HR faithfulness judges (speed + cost)",
+        description="Compare LLM vs decision-model HR faithfulness judges (speed + cost)",
     )
     parser.add_argument(
         "--dataset",
@@ -451,7 +454,7 @@ async def main() -> int:
 
     print(f"Dataset: {args.dataset} ({len(examples)} examples)")
     print(f"Model (agent + LLM judge): {model}")
-    print(f"Jev pass threshold: {FAITHFUL_PASS}")
+    print(f"Decision pass threshold: {FAITHFUL_PASS}")
     print()
     print("=== Generate HR specialist answers (shared) ===")
     cases, gen_s, gen_in, gen_out, gen_cost = await generate_cases(
@@ -465,13 +468,13 @@ async def main() -> int:
     print("=== LLM judge (always-on) ===")
     llm = await run_llm_judge(cases, model)
     print()
-    print("=== Jev (per call, LLM critique on fail) ===")
-    jev = await run_jev_per_call(cases, model, llm.labels)
+    print("=== Decision (per call, LLM critique on fail) ===")
+    decision = await run_decision_per_call(cases, model, llm.labels)
     print()
-    print("=== Jev (batch, LLM critique on fail) ===")
-    jev_batch = await run_jev_batch(cases, model, llm.labels)
+    print("=== Decision (batch, LLM critique on fail) ===")
+    decision_batch = await run_decision_batch(cases, model, llm.labels)
     print()
-    print_table(llm, jev, jev_batch)
+    print_table(llm, decision, decision_batch)
     return 0
 
 

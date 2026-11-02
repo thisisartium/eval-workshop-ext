@@ -1,13 +1,13 @@
-# Jev HR Specialist Experiment Configuration (untuned)
+# Decision-model HR specialist experiment (untuned)
 #
-# Same agent as with_specialists.yaml; faithfulness scored by TypeSafe Jev.
+# Same agent as with_specialists.yaml; faithfulness scored by a decision model.
 #
 # Run with:
-#   cat-experiments run experiments/jev_hr_specialist.py \
-#     -c experiments/jev_hr_baseline.yaml --dataset live_hr
+#   cat-experiments run experiments/decision_hr_specialist.py \
+#     -c experiments/decision_hr_baseline.yaml --dataset live_hr
 
-name: "hr-jev-with-specialists"
-description: "HR specialist (untuned) with Jev faithfulness judge"
+name: "hr-decision-with-specialists"
+description: "HR specialist (untuned) with decision-model faithfulness judge"
 
 params:
   agent_config: "configs/agents/hr_with_specialists.yaml"

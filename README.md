@@ -79,16 +79,16 @@ eval-workshop-ext/
 ├── data/                    # Datasets (JSONL format)
 ├── docs/
 │   ├── workshop.md          # Workshop guide
-│   ├── why_jev.md           # Why Jev for routing + evals (with bench numbers)
-│   ├── jev_router.md        # Optional Jev router path
-│   └── jev_hr_judge.md      # Optional Jev faithfulness judge path
-├── experiments/             # Experiment definitions (LLM + optional Jev*)
+│   ├── why_decision_models.md  # Why decision models for routing + evals
+│   ├── decision_router.md      # Optional System One router path
+│   └── decision_hr_judge.md    # Optional decision faithfulness judge
+├── experiments/             # Experiment definitions (LLM + optional decision_*)
 ├── kb/                      # Knowledge base documents
 ├── prompts/                 # Prompt files (versioned)
 ├── scripts/                 # CLI tools + compare_*_bench.py
 └── src/
     ├── agent_platform/      # Custom agent runtime
-    └── helpdesk/            # Helpdesk domain (+ optional jev_*.py)
+    └── helpdesk/            # Helpdesk domain (+ optional decision_*.py)
 ```
 
 ## Service URLs
@@ -100,5 +100,5 @@ eval-workshop-ext/
 ## Prerequisites
 
 - **Anthropic API key** ([get one here](https://console.anthropic.com/settings/keys)) or **OpenAI API key** ([get one here](https://platform.openai.com/api-keys))
-- **Optional:** TypeSafe API key for Jev paths — start with [why_jev.md](docs/why_jev.md), then [jev_router.md](docs/jev_router.md) / [jev_hr_judge.md](docs/jev_hr_judge.md)
+- **Optional:** decision-model path (default TypeSafe Jev via LiteLLM) — start with [why_decision_models.md](docs/why_decision_models.md), then [decision_router.md](docs/decision_router.md) / [decision_hr_judge.md](docs/decision_hr_judge.md). Public benches: [Artificial Analysis Decision Index](https://artificialanalysis.ai/evaluations/artificial-analysis-decision-index)
 - **One of:** GitHub Codespaces (browser only), VS Code with Dev Containers extension, or local Python 3.13+ with Docker

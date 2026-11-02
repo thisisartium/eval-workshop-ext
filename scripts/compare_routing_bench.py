@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare escalate-only agent routing vs Jev (per-call and batch).
+"""Compare escalate-only agent routing vs decision model (per-call and batch).
 
 Runs routers on the same JSONL dataset and prints accuracy, wall-clock,
 tokens, USD cost, and API call counts. Costs use ``helpdesk.pricing``.
@@ -19,7 +19,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from dotenv import load_dotenv
-from typesafe_sdk import AsyncTypeSafeClient
 
 from agent_platform.observability import (
     CostTracker,
@@ -30,7 +29,7 @@ from agent_platform.observability import (
 )
 from agent_platform.runner import collect
 from helpdesk.app import create_app, default_model
-from helpdesk.jev_router import route_batch_with_jev, route_with_jev
+from helpdesk.decision_router import route_batch_with_decision, route_with_decision
 from helpdesk.pricing import estimate_cost, format_rates_footer, resolve_rate
 
 
@@ -117,10 +116,10 @@ def _print_compare(label: str, slow: MethodTotals, fast: MethodTotals) -> None:
 
 def print_table(
     agent: MethodTotals,
-    jev: MethodTotals,
-    jev_batch: MethodTotals,
+    decision: MethodTotals,
+    decision_batch: MethodTotals,
 ) -> None:
-    rows = [agent, jev, jev_batch]
+    rows = [agent, decision, decision_batch]
     headers = (
         "Method",
         "Accuracy",
@@ -161,15 +160,15 @@ def print_table(
         print(fmt(row))
 
     print()
-    _print_compare("agent / jev-batch", agent, jev_batch)
+    _print_compare("agent / decision-batch", agent, decision_batch)
     print()
-    _print_compare("jev-per-call / jev-batch", jev, jev_batch)
+    _print_compare("decision-per-call / decision-batch", decision, decision_batch)
     print()
     print(f"Agent model:     {agent.model}")
-    print(f"Jev model:       {jev.model}")
-    print(f"Jev batch model: {jev_batch.model}")
+    print(f"Decision model:       {decision.model}")
+    print(f"Decision batch model: {decision_batch.model}")
     print()
-    print(format_rates_footer([agent.model, jev.model, jev_batch.model]))
+    print(format_rates_footer([agent.model, decision.model, decision_batch.model]))
 
 
 async def run_agent_pass(
@@ -214,41 +213,38 @@ async def run_agent_pass(
     return totals
 
 
-async def run_jev_pass(examples: list[dict]) -> MethodTotals:
-    totals = MethodTotals(name="Jev (per call)", model="jev-latest")
-    async with AsyncTypeSafeClient() as ts_client:
-        for ex in examples:
-            request = ex.get("input", {}).get("request", "")
-            expected = (ex.get("output") or {}).get("department")
+async def run_decision_pass(examples: list[dict]) -> MethodTotals:
+    totals = MethodTotals(name="Decision (per call)", model="decision")
+    for ex in examples:
+        request = ex.get("input", {}).get("request", "")
+        expected = (ex.get("output") or {}).get("department")
 
-            t0 = time.perf_counter()
-            result = await route_with_jev(
-                request, client=ts_client, escalate=False
-            )
-            elapsed = time.perf_counter() - t0
+        t0 = time.perf_counter()
+        result = await route_with_decision(request, escalate=False)
+        elapsed = time.perf_counter() - t0
 
-            if result.model:
-                totals.model = result.model
-                resolve_rate(result.model)
+        if result.model:
+            totals.model = result.model
+            resolve_rate(result.model)
 
-            totals.seconds += elapsed
-            totals.total += 1
-            totals.api_calls += 1
-            totals.input_tokens += result.input_tokens
-            totals.output_tokens += result.output_tokens
-            totals.departments.append(result.department)
-            if expected is not None and result.department == expected:
-                totals.correct += 1
-            print(
-                f"  [jev]   {ex.get('id', '?')}: "
-                f"{result.department!r} (expected {expected!r}) {elapsed:.2f}s "
-                f"tok={result.input_tokens}/{result.output_tokens}"
-            )
+        totals.seconds += elapsed
+        totals.total += 1
+        totals.api_calls += 1
+        totals.input_tokens += result.input_tokens
+        totals.output_tokens += result.output_tokens
+        totals.departments.append(result.department)
+        if expected is not None and result.department == expected:
+            totals.correct += 1
+        print(
+            f"  [decision] {ex.get('id', '?')}: "
+            f"{result.department!r} (expected {expected!r}) {elapsed:.2f}s "
+            f"tok={result.input_tokens}/{result.output_tokens}"
+        )
 
     return totals
 
 
-async def run_jev_batch_pass(examples: list[dict]) -> MethodTotals:
+async def run_decision_batch_pass(examples: list[dict]) -> MethodTotals:
     tickets: dict[str, str] = {}
     expected_by_id: dict[str, str | None] = {}
     for ex in examples:
@@ -256,13 +252,12 @@ async def run_jev_batch_pass(examples: list[dict]) -> MethodTotals:
         tickets[ex_id] = ex.get("input", {}).get("request", "")
         expected_by_id[ex_id] = (ex.get("output") or {}).get("department")
 
-    totals = MethodTotals(name="Jev (batch)", model="jev-latest")
-    print(f"  Jev batch: 1 system_one call for {len(tickets)} examples")
+    totals = MethodTotals(name="Decision (batch)", model="decision")
+    print(f"  Decision batch: 1 systemone call for {len(tickets)} examples")
 
-    async with AsyncTypeSafeClient() as ts_client:
-        t0 = time.perf_counter()
-        batch = await route_batch_with_jev(tickets, client=ts_client)
-        elapsed = time.perf_counter() - t0
+    t0 = time.perf_counter()
+    batch = await route_batch_with_decision(tickets)
+    elapsed = time.perf_counter() - t0
 
     if batch.model:
         totals.model = batch.model
@@ -295,7 +290,7 @@ async def run_jev_batch_pass(examples: list[dict]) -> MethodTotals:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Compare agent vs Jev routing (speed + cost)",
+        description="Compare agent vs decision-model routing (speed + cost)",
     )
     parser.add_argument(
         "--dataset",
@@ -328,13 +323,13 @@ async def main() -> int:
     print("=== Agent (baseline escalate-only) ===")
     agent = await run_agent_pass(examples, model)
     print()
-    print("=== Jev (per call) ===")
-    jev = await run_jev_pass(examples)
+    print("=== Decision (per call) ===")
+    decision = await run_decision_pass(examples)
     print()
-    print("=== Jev (batch) ===")
-    jev_batch = await run_jev_batch_pass(examples)
+    print("=== Decision (batch) ===")
+    decision_batch = await run_decision_batch_pass(examples)
     print()
-    print_table(agent, jev, jev_batch)
+    print_table(agent, decision, decision_batch)
     return 0
 
 

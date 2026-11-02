@@ -1,13 +1,13 @@
-# Jev HR Specialist Experiment Configuration (tuned)
+# Decision-model HR specialist experiment (tuned)
 #
-# Same agent as hr_tuned.yaml; faithfulness scored by TypeSafe Jev.
+# Same agent as hr_tuned.yaml; faithfulness scored by a decision model.
 #
 # Run with:
-#   cat-experiments run experiments/jev_hr_specialist.py \
-#     -c experiments/jev_hr_tuned.yaml --dataset live_hr
+#   cat-experiments run experiments/decision_hr_specialist.py \
+#     -c experiments/decision_hr_tuned.yaml --dataset live_hr
 
-name: "hr-jev-tuned"
-description: "Tuned HR specialist with Jev faithfulness judge"
+name: "hr-decision-tuned"
+description: "Tuned HR specialist with decision-model faithfulness judge"
 
 params:
   agent_config: "configs/agents/hr_tuned.yaml"
