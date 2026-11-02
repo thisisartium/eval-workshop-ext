@@ -1,7 +1,7 @@
 """LLM faithfulness critique for HR specialist responses.
 
-Shared by the always-on LLM judge experiment and the hybrid Jev path
-(which calls this only when the Jev score is below threshold).
+Shared by the always-on LLM judge experiment and the hybrid decision-model
+path (which calls this only when the decision score is below threshold).
 """
 
 from __future__ import annotations
@@ -63,6 +63,7 @@ async def judge_with_llm(prompt: str, model: str) -> dict:
         }
         if model.startswith("gpt-6"):
             create_kwargs["max_completion_tokens"] = 1024
+            create_kwargs["reasoning_effort"] = "low"
         else:
             create_kwargs["temperature"] = 0
             create_kwargs["max_tokens"] = 1024

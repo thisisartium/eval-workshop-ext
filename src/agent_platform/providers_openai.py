@@ -52,6 +52,7 @@ class OpenAIProvider:
             instructions=instructions,
             input=messages,
             tools=tools if tools else [],
+            reasoning={"effort": "low"},
         )
 
         # Extract tool calls
