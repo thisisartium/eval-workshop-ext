@@ -52,6 +52,7 @@ class OpenAIProvider:
             instructions=instructions,
             input=messages,
             tools=tools if tools else [],
+            reasoning={"effort": "low"},
         )
 
         # Extract tool calls
@@ -135,10 +136,27 @@ class OpenAIProvider:
         """
         raw = response.raw
         # Return the raw output items directly — the Responses API expects
-        # its own output format echoed back as input items.
+        # its own output format echoed back as input items. Reasoning models
+        # (e.g. gpt-6-luna) require the reasoning item that precedes a
+        # function_call to be included, or the next turn returns 400.
         output_items = []
         for item in raw.output:
-            if item.type == "function_call":
+            if item.type == "reasoning":
+                dumped = item.model_dump(exclude_none=True)
+                reasoning_item: dict[str, Any] = {
+                    "type": "reasoning",
+                    "id": dumped.get("id"),
+                }
+                if dumped.get("summary") is not None:
+                    reasoning_item["summary"] = dumped["summary"]
+                if dumped.get("content") is not None:
+                    reasoning_item["content"] = dumped["content"]
+                if dumped.get("encrypted_content") is not None:
+                    reasoning_item["encrypted_content"] = dumped[
+                        "encrypted_content"
+                    ]
+                output_items.append(reasoning_item)
+            elif item.type == "function_call":
                 output_items.append({
                     "type": "function_call",
                     "id": item.id,

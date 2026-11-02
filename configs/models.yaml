@@ -10,4 +10,4 @@
 # Override at the CLI with: --model <model-id>
 
 anthropic: "claude-sonnet-4-6"
-openai: "gpt-4o-mini"
+openai: "gpt-6-luna"

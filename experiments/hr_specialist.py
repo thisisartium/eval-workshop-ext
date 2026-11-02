@@ -31,8 +31,6 @@ Configurable Parameters
 
 from __future__ import annotations
 
-import json
-
 from dotenv import load_dotenv
 from opentelemetry import trace
 
@@ -42,49 +40,11 @@ from cat.experiments.protocol import EvalInput, EvalOutput, TaskInput, TaskOutpu
 from cat.experiments.sdk import evaluator, task
 from cat.experiments.sdk.tracing import extract_retrieval_context
 from helpdesk.app import create_specialist_app, default_model
+from helpdesk.llm_faithfulness_critique import (
+    faithfulness_critique_prompt,
+    judge_with_llm,
+)
 
-
-async def judge_with_llm(prompt: str, model: str) -> dict:
-    """Run an LLM judge and parse the JSON verdict."""
-    if model.startswith("claude"):
-        from anthropic import AsyncAnthropic
-
-        client = AsyncAnthropic()
-        response = await client.messages.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-            max_tokens=1024,
-        )
-        content = response.content[0].text if response.content else "{}"
-    else:
-        from openai import AsyncOpenAI
-
-        client = AsyncOpenAI()
-        response = await client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-            response_format={"type": "json_object"},
-        )
-        content = response.choices[0].message.content or "{}"
-
-    stripped = content.strip()
-    if stripped.startswith("```"):
-        lines = stripped.split("\n")
-        lines = [l for l in lines[1:] if l.strip() != "```"]
-        stripped = "\n".join(lines)
-
-    try:
-        result = json.loads(stripped)
-        return {
-            "pass": bool(result.get("pass", False)),
-            "critique": result.get("critique", ""),
-        }
-    except (json.JSONDecodeError, ValueError, TypeError):
-        return {"pass": False, "critique": f"Failed to parse judge response: {content}"}
-
-# Load environment variables for API keys
 load_dotenv()
 
 
@@ -133,7 +93,7 @@ async def answer_hr_question(input_data: TaskInput) -> TaskOutput:
 
     request = input_data.input.get("request", "")
 
-    text, events = await collect(client.send(request))
+    text, _ = await collect(client.send(request))
 
     return TaskOutput(
         output={
@@ -174,46 +134,7 @@ async def hr_response_quality(eval_input: EvalInput) -> EvalOutput:
 
     judge_model = eval_input.params.get("judge_model") or default_model()
 
-    prompt = f"""You are a hallucination judge. You are given a question, the content \
-retrieved from a knowledge base, and an agent's response. Your job is to determine \
-whether the agent's response is **faithful** to the retrieved KB content.
-
-## Input
-
-User Question:
-{question}
-
-Retrieved KB Content:
-{retrieved_context if retrieved_context else "(No content was retrieved from the knowledge base)"}
-
-Agent Response:
-{response if response else "(No response provided)"}
-
-## Evaluation Criteria
-
-PASS if:
-- Every factual claim in the response is supported by the retrieved KB content
-- OR the agent stated that it could not find relevant information in the KB \
-(this is a correct response when the KB has no relevant content)
-
-FAIL if:
-- The response contains specific facts, numbers, dates, or policy details that \
-are NOT present in the retrieved KB content (hallucination)
-
-## Instructions
-
-Compare each factual claim in the agent's response against the retrieved KB content. \
-If you find any claim that is not supported by the KB, the response fails.
-
-Note: Generic phrasing like "feel free to ask" or "you can contact HR" is not a \
-factual claim and should not be judged.
-
-Respond with JSON:
-{{
-  "critique": "Your detailed reasoning, listing any unsupported claims if found...",
-  "pass": true or false
-}}"""
-
+    prompt = faithfulness_critique_prompt(question, retrieved_context, response)
     judgment = await judge_with_llm(prompt, judge_model)
 
     passed = judgment["pass"]
