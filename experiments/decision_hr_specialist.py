@@ -13,8 +13,8 @@ Run with:
     cat-experiments run experiments/decision_hr_specialist.py \
         -c experiments/decision_hr_tuned.yaml --dataset live_hr
 
-Requires a provider key for the configured ``DECISION_MODEL`` (default TypeSafe
-Jev needs ``TYPESAFE_API_KEY``).
+Requires a provider key for the configured ``DECISION_MODEL`` (default
+``openai/gpt-6-luna`` needs ``OPENAI_API_KEY``).
 
 Evaluators
 ==========

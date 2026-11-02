@@ -7,7 +7,7 @@ This workshop uses a **System One / decision model** (via [LiteLLM](https://docs
 
 Chat models are good at conversation and tool use. Decision models answer **typed questions** with **calibrated probabilities**, so application code can threshold, log, and act. That split is the main idea: **the model judges, code decides**; LLMs still generate answers where we need language.
 
-The default LiteLLM model here is TypeSafe Jev (`typesafe/jev-1.14.0`) — one example of a decision model. Override with `DECISION_MODEL` if you use another System One provider.
+The default LiteLLM model here is OpenAI Decisions (`openai/gpt-6-luna`). Override with `DECISION_MODEL` for another provider (e.g. `typesafe/jev-1.14.0`).
 
 For public benchmarks of the latest System One / decision models, see the [Artificial Analysis Decision Index](https://artificialanalysis.ai/evaluations/artificial-analysis-decision-index).
 

@@ -25,7 +25,7 @@ from agent_platform.observability import Span, ToolSpanData, TracingProcessor
 from helpdesk.tools import escalate_to_department
 
 # Default LiteLLM decision model (override with DECISION_MODEL).
-_DEFAULT_DECISION_MODEL = "typesafe/jev-1.14.0"
+_DEFAULT_DECISION_MODEL = "openai/gpt-6-luna"
 
 
 def decision_model() -> str:

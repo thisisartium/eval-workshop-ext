@@ -2,7 +2,7 @@
 
 Scores HR specialist responses with a **System One / decision model** via [LiteLLM](https://docs.litellm.ai/docs/decisions/) (`asystemone`) instead of always calling a binary LLM-as-judge. Same task as `experiments/hr_specialist.py`: run the specialist directly and evaluate groundedness against retrieved KB content.
 
-Default model: TypeSafe Jev (`typesafe/jev-1.14.0`). Override with `DECISION_MODEL`. Public comparison: [Artificial Analysis Decision Index](https://artificialanalysis.ai/evaluations/artificial-analysis-decision-index).
+Default model: OpenAI Decisions (`openai/gpt-6-luna`). Override with `DECISION_MODEL` (e.g. `typesafe/jev-1.14.0`). Public comparison: [Artificial Analysis Decision Index](https://artificialanalysis.ai/evaluations/artificial-analysis-decision-index).
 
 ## Why
 
@@ -14,7 +14,7 @@ Cat Cafe accepts continuous float scores; this path uses them as the evaluator s
 
 ## Setup
 
-Requires a provider key for the configured `DECISION_MODEL` (default TypeSafe needs `TYPESAFE_API_KEY`). See [decision_router.md](decision_router.md). Also needs the usual OpenAI/Anthropic key for fail-only critiques.
+Requires a provider key for the configured `DECISION_MODEL` (default needs `OPENAI_API_KEY`). See [decision_router.md](decision_router.md). Also needs the usual OpenAI/Anthropic key for fail-only critiques.
 
 ## Side-by-side experiment
 

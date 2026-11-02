@@ -2,7 +2,7 @@
 
 Escalate-only helpdesk routing using a **System One / decision model** via [LiteLLM](https://docs.litellm.ai/docs/decisions/) (`asystemone`) instead of the LLM concierge. Same surface as the routing baseline: classify department, then call `escalate_to_department`.
 
-Default model: TypeSafe Jev (`typesafe/jev-1.14.0`). Override with `DECISION_MODEL`. For how decision models compare publicly, see the [Artificial Analysis Decision Index](https://artificialanalysis.ai/evaluations/artificial-analysis-decision-index).
+Default model: OpenAI Decisions (`openai/gpt-6-luna`). Override with `DECISION_MODEL` (e.g. `typesafe/jev-1.14.0`). For how decision models compare publicly, see the [Artificial Analysis Decision Index](https://artificialanalysis.ai/evaluations/artificial-analysis-decision-index).
 
 ## Why
 
@@ -12,12 +12,11 @@ Default model: TypeSafe Jev (`typesafe/jev-1.14.0`). Override with `DECISION_MOD
 
 ## Setup
 
-1. For the default TypeSafe model, create an API key and add it to `.env` (LiteLLM reads `TYPESAFE_API_KEY`):
+1. For the default OpenAI model, set `OPENAI_API_KEY` in `.env`. Optional overrides:
 
 ```bash
-TYPESAFE_API_KEY=...
-# Optional override (default typesafe/jev-1.14.0):
-# DECISION_MODEL=typesafe/jev-1.14.0
+# DECISION_MODEL=openai/gpt-6-luna   # default
+# DECISION_MODEL=typesafe/jev-1.14.0 # needs TYPESAFE_API_KEY
 ```
 
 2. Install deps (includes `litellm`):
