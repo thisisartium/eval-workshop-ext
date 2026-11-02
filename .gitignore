@@ -48,6 +48,11 @@ Thumbs.db
 *.swo
 *~
 
+# Local agent / Cursor skills (not part of the workshop tree)
+.agents/
+.cursor/
+skills-lock.json
+
 # Temporary files
 tmp/
 temp/

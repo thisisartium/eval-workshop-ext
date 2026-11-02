@@ -1,0 +1,66 @@
+# Decision HR Faithfulness Judge (parallel path)
+
+Scores HR specialist responses with a **System One / decision model** via [LiteLLM](https://docs.litellm.ai/docs/decisions/) (`asystemone`) instead of always calling a binary LLM-as-judge. Same task as `experiments/hr_specialist.py`: run the specialist directly and evaluate groundedness against retrieved KB content.
+
+Default model: OpenAI Decisions (`openai/gpt-6-luna`). Override with `DECISION_MODEL` (e.g. `typesafe/jev-1.14.0`). Public comparison: [Artificial Analysis Decision Index](https://artificialanalysis.ai/evaluations/artificial-analysis-decision-index).
+
+## Why
+
+- **Noul** returns a calibrated probability that the response is faithful to the KB (always)
+- **Code** applies the pass threshold (`0.8`)
+- **LLM critique** runs only when `score < 0.8` — clear passes skip the expensive judge call
+
+Cat Cafe accepts continuous float scores; this path uses them as the evaluator score.
+
+## Setup
+
+Requires a provider key for the configured `DECISION_MODEL` (default needs `OPENAI_API_KEY`). See [decision_router.md](decision_router.md). Also needs the usual OpenAI/Anthropic key for fail-only critiques.
+
+## Side-by-side experiment
+
+```bash
+uv run python scripts/register_dataset.py data/live_workshop_hr.jsonl --name live_hr
+
+# LLM binary judge (critique every example)
+uv run cat-experiments run experiments/hr_specialist.py \
+  -c experiments/with_specialists.yaml \
+  --dataset live_hr
+
+# Decision probability + LLM critique on fails only
+uv run cat-experiments run experiments/decision_hr_specialist.py \
+  -c experiments/decision_hr_baseline.yaml \
+  --dataset live_hr
+```
+
+Tuned agent variant:
+
+```bash
+uv run cat-experiments run experiments/decision_hr_specialist.py \
+  -c experiments/decision_hr_tuned.yaml \
+  --dataset live_hr
+```
+
+Compare in Cat Cafe under **Datasets → live_hr → Experiments**.
+
+## Decision table
+
+| `is_faithful` Noul | Label | Explanation |
+| --- | --- | --- |
+| `>= 0.8` | `pass` | Empty (no LLM call) |
+| `< 0.8` | `fail` | LLM critique (same prompt as the baseline judge) |
+
+Filter fails in Cat Cafe:
+
+```
+evaluations.hr_response_quality.score < 0.8
+```
+
+## Files
+
+| Path | Role |
+| --- | --- |
+| `src/helpdesk/decision_hr_judge.py` | Noul + threshold |
+| `src/helpdesk/llm_faithfulness_critique.py` | Shared LLM critique prompt/call |
+| `experiments/decision_hr_specialist.py` | Same HR task + hybrid `hr_response_quality` |
+| `experiments/decision_hr_baseline.yaml` | Untuned agent + decision judge |
+| `experiments/decision_hr_tuned.yaml` | Tuned agent + decision judge |
